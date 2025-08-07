@@ -250,10 +250,10 @@ impl Application for BuildABadgeApp {
                 self.selected_led_mode = Some(mode);
             }
             Message::BadgeNameChanged(name) => {
-                // Filter to alphanumeric characters only and limit to 23 characters
+                // Filter to alphanumeric characters only and limit to 10 characters
                 let filtered_name: String = name.chars().filter(|c| c.is_alphanumeric()).collect();
 
-                if filtered_name.len() <= 23 {
+                if filtered_name.len() <= 10 {
                     self.badge_name = filtered_name;
                 }
             }
@@ -714,10 +714,10 @@ impl BuildABadgeApp {
 
         // Create the input section with better spacing and centering
         let character_count = self.badge_name.len();
-        let characters_remaining = 23 - character_count;
-        let counter_color = if characters_remaining <= 3 {
+        let characters_remaining = 10_usize.saturating_sub(character_count);
+        let counter_color = if characters_remaining <= 2 {
             Color::from_rgb8(200, 0, 0) // Red when close to limit
-        } else if characters_remaining <= 7 {
+        } else if characters_remaining <= 3 {
             Color::from_rgb8(255, 140, 0) // Orange when getting close
         } else {
             Color::from_rgb8(100, 100, 100) // Gray when plenty of room
@@ -1674,6 +1674,9 @@ wifiAPssid={badge_name}-WiLi
 wifiAPAuth=0
 btEn=1
 btAPen={badge_name}-WiLi
-btTerm=1\n"
+btTerm=1
+serverStart=1
+orcaBottlenoseComm=1
+defscript=/scripts/build_a_badge.wasm\n"
     )
 }
