@@ -250,10 +250,10 @@ impl Application for BuildABadgeApp {
                 self.selected_led_mode = Some(mode);
             }
             Message::BadgeNameChanged(name) => {
-                // Filter to alphanumeric characters only and limit to 10 characters
+                // Filter to alphanumeric characters only and limit to 20 characters
                 let filtered_name: String = name.chars().filter(|c| c.is_alphanumeric()).collect();
 
-                if filtered_name.len() <= 10 {
+                if filtered_name.len() <= 20 {
                     self.badge_name = filtered_name;
                 }
             }
@@ -714,7 +714,7 @@ impl BuildABadgeApp {
 
         // Create the input section with better spacing and centering
         let character_count = self.badge_name.len();
-        let characters_remaining = 10_usize.saturating_sub(character_count);
+        let characters_remaining = 20_usize.saturating_sub(character_count);
         let counter_color = if characters_remaining <= 2 {
             Color::from_rgb8(200, 0, 0) // Red when close to limit
         } else if characters_remaining <= 3 {
@@ -1273,6 +1273,7 @@ fn configuration_subscription(
                         let result = tokio::time::timeout(
                             Duration::from_secs(30), // 10 second timeout
                             tokio::process::Command::new("fwi-serial")
+                                .current_dir(".")
                                 .arg("-s")
                                 .arg("build_a_badge.txt")
                                 .arg("-fn")
@@ -1369,6 +1370,7 @@ fn configuration_subscription(
                         let result = tokio::time::timeout(
                             Duration::from_secs(30), // 10 second timeout
                             tokio::process::Command::new("fwi-serial")
+                                .current_dir(".")
                                 .arg("-s")
                                 .arg(image_file_path)
                                 .arg("-fn")
@@ -1438,6 +1440,7 @@ fn configuration_subscription(
                         let result = tokio::time::timeout(
                             Duration::from_secs(30), // 10 second timeout
                             tokio::process::Command::new("fwi-serial")
+                                .current_dir(".")
                                 .arg("-s")
                                 .arg("build_a_badge.wasm")
                                 .output()
@@ -1498,6 +1501,7 @@ fn configuration_subscription(
                         let result = tokio::time::timeout(
                             Duration::from_secs(30), // 10 second timeout
                             tokio::process::Command::new("fwi-serial")
+                                .current_dir(".")
                                 .arg("-s")
                                 .arg("settings.txt")
                                 .arg("-fn")
@@ -1569,6 +1573,7 @@ fn configuration_subscription(
                         let result = tokio::time::timeout(
                             Duration::from_secs(30),
                             tokio::process::Command::new("fwi-serial")
+                                .current_dir(".")
                                 .arg("-w")
                                 .arg("build_a_badge.wasm")
                                 .output()
