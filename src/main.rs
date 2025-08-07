@@ -169,7 +169,10 @@ impl Application for BuildABadgeApp {
                 self.selected_led_mode = Some(mode);
             }
             Message::BadgeNameChanged(name) => {
-                self.badge_name = name;
+                // Limit the badge name to 23 characters
+                if name.len() <= 23 {
+                    self.badge_name = name;
+                }
             }
 
             Message::Tick(now) => {
@@ -506,49 +509,85 @@ impl BuildABadgeApp {
         .padding(20)
         .width(Length::Fill);
 
+        // Create the badge image container with consistent sizing
+        let badge_image_container = container(
+            image(NAME_ME_IMAGE.clone())
+                .width(Length::Fixed(300.0))
+                .height(Length::Fixed(300.0))
+                .content_fit(ContentFit::ScaleDown)
+        )
+        .width(Length::Fixed(320.0))
+        .height(Length::Fixed(320.0))
+        .center_x()
+        .center_y()
+        .style(theme_fn_container(UserImageBorderStyle));
+
+        // Create the input section with better spacing and centering
+        let character_count = self.badge_name.len();
+        let characters_remaining = 23 - character_count;
+        let counter_color = if characters_remaining <= 3 {
+            Color::from_rgb8(200, 0, 0) // Red when close to limit
+        } else if characters_remaining <= 7 {
+            Color::from_rgb8(255, 140, 0) // Orange when getting close
+        } else {
+            Color::from_rgb8(100, 100, 100) // Gray when plenty of room
+        };
+
+        let input_section = container(
+            column![
+                text("Type Your Badge Name Below")
+                    .size(HEADING_SIZE)
+                    .horizontal_alignment(iced::alignment::Horizontal::Center)
+                    .width(Length::Fill),
+                Space::new(Length::Shrink, Length::Fixed(20.0)),
+                container(
+                    text_input::<_, Theme, iced::Renderer>("Enter name...", &self.badge_name)
+                        .on_input(Message::BadgeNameChanged)
+                        .padding(15)
+                        .size(BODY_SIZE)
+                        .width(Length::Fixed(300.0))
+                )
+                .width(Length::Fill)
+                .center_x(),
+                Space::new(Length::Shrink, Length::Fixed(10.0)),
+                text(format!("{} characters remaining", characters_remaining))
+                    .size(14)
+                    .horizontal_alignment(iced::alignment::Horizontal::Center)
+                    .style(iced::theme::Text::Color(counter_color))
+                    .width(Length::Fill),
+            ]
+            .align_items(Alignment::Center)
+            .spacing(5)
+        )
+        .width(Length::Fixed(400.0))
+        .center_x()
+        .center_y();
+
         column![
-            Space::with_height(Length::Fixed(50.0)),
+            Space::with_height(Length::Fixed(30.0)),
             image(PLACE_ME_ICON.clone())
                 .width(Length::Fixed(120.0))
                 .height(Length::Fixed(120.0)),
             text("Place Me")
                 .size(HEADING_SIZE)
                 .horizontal_alignment(iced::alignment::Horizontal::Center),
-            Space::new(Length::Fill, Length::Fill),
-            row![
-                container(image(NAME_ME_IMAGE.clone())
-                    .width(Length::Fill)
-                    .height(Length::Fill)
-                    .content_fit(ContentFit::ScaleDown))
-                    .width(Length::FillPortion(1))
-                    .height(Length::FillPortion(1))
-                    .align_x(iced::alignment::Horizontal::Center)
-                    .align_y(iced::alignment::Vertical::Center),
-                container(column![
-                    text("Type Your Badge Name Below")
-                        .size(HEADING_SIZE)
-                        .horizontal_alignment(iced::alignment::Horizontal::Center)
-                        .width(Length::Fill),
-                    Space::new(Length::Shrink, Length::Fixed(20.0)),
-                    text_input::<_, Theme, iced::Renderer>("Enter name...", &self.badge_name)
-                        .on_input(Message::BadgeNameChanged)
-                        .padding(10)
-                        .size(BODY_SIZE)
-                        .width(Length::Fill),
-                ])
-                .width(Length::FillPortion(1))
-                .height(Length::Shrink)
-                .align_x(iced::alignment::Horizontal::Center)
-                .align_y(iced::alignment::Vertical::Center),
-            ]
+            Space::new(Length::Shrink, Length::Fixed(20.0)),
+            // Main content area with better proportions
+            container(
+                row![
+                    badge_image_container,
+                    Space::with_width(Length::Fixed(40.0)),
+                    input_section,
+                ]
+                .align_items(Alignment::Center)
+                .width(Length::Shrink)
+            )
             .width(Length::Fill)
-            .height(Length::FillPortion(2))
-            .align_items(Alignment::Center)
-            .spacing(20),
-            Space::new(Length::Fill, Length::Fill),
+            .center_x(),
+            Space::with_height(Length::Fill),
             bottom_buttons,
         ]
-        .spacing(10)
+        .spacing(15)
         .align_items(Alignment::Center)
         .width(Length::Fill)
         .height(Length::Fill)
