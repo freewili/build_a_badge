@@ -1,5 +1,5 @@
 // main.rs
-use iced::widget::{button, column, container, row, text, Space, image, radio, text_input};
+use iced::widget::{button, column, container, row, text, Space, image, radio, text_input, progress_bar};
 use iced::{
     Alignment, Element, Length, Settings, Theme, Color, Size, Border,
     Application, Command, Subscription, executor,
@@ -69,6 +69,7 @@ enum AppScreen {
     CustomizeBadge,
     CustomizeLeds,
     NameBadge,
+    Summary,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -116,6 +117,10 @@ struct BuildABadgeApp {
     selected_led_mode: Option<LedMode>,
     badge_name: String,
     
+    // Configuration state
+    is_configuring: bool,
+    configuration_progress: f32,
+    
     // Animation state
     transition: AppScreenTransition,
     current_opacity: f32,
@@ -128,6 +133,8 @@ enum Message {
     SelectCustomizeImage(image::Handle),
     SelectLedMode(LedMode),
     BadgeNameChanged(String),
+    StartConfiguration,
+    ConfigurationProgress,
     
     // Animation messages
     Tick(Instant),
@@ -161,6 +168,9 @@ impl Application for BuildABadgeApp {
             selected_customize_image: None,
             selected_led_mode: None,
             badge_name: String::new(),
+            
+            is_configuring: false,
+            configuration_progress: 0.0,
             
             transition: AppScreenTransition::FadingIn,
             current_opacity: 0.0,
@@ -201,6 +211,19 @@ impl Application for BuildABadgeApp {
                     self.badge_name = filtered_name;
                 }
             }
+            Message::StartConfiguration => {
+                self.is_configuring = true;
+                self.configuration_progress = 0.0;
+            }
+            Message::ConfigurationProgress => {
+                if self.is_configuring && self.configuration_progress < 1.0 {
+                    self.configuration_progress += 0.02; // Increment by 2% each update
+                    if self.configuration_progress >= 1.0 {
+                        self.configuration_progress = 1.0;
+                        self.is_configuring = false;
+                    }
+                }
+            }
 
             Message::Tick(now) => {
                 let elapsed_transition = (now - self.transition_start_time).as_millis() as u64;
@@ -227,6 +250,11 @@ impl Application for BuildABadgeApp {
                     },
                     AppScreenTransition::Idle => {}
                 }
+                
+                // Update configuration progress if configuring
+                if self.is_configuring {
+                    return self.update(Message::ConfigurationProgress);
+                }
             }
         }
         Command::none()
@@ -243,6 +271,7 @@ impl Application for BuildABadgeApp {
             AppScreen::CustomizeBadge => self.render_customize_badge_screen(),
             AppScreen::CustomizeLeds => self.render_customize_leds_screen(),
             AppScreen::NameBadge => self.render_name_badge_screen(),
+            AppScreen::Summary => self.render_summary_screen(),
         };
 
         let animated_content = container(current_screen_element)
@@ -483,7 +512,7 @@ impl BuildABadgeApp {
         // Create two columns for better layout
         let radio_buttons = modes.chunks(5).enumerate().fold(
             row!().spacing(80).align_items(Alignment::Start),
-            |row_acc, (col_idx, chunk)| {
+            |row_acc, (_col_idx, chunk)| {
                 let column = chunk.iter().fold(
                     column!().spacing(18).align_items(Alignment::Start),
                     |col_acc, mode| {
@@ -538,7 +567,7 @@ impl BuildABadgeApp {
             .style(theme_fn(YellowButtonStyle));
 
         let submit_button = button(text("Submit").size(BUTTON_TEXT_SIZE))
-            .on_press(Message::NavigateTo(AppScreen::Welcome))
+            .on_press(Message::NavigateTo(AppScreen::Summary))
             .padding([5,20])
             .style(theme_fn(YellowButtonStyle));
 
@@ -635,6 +664,144 @@ impl BuildABadgeApp {
             bottom_buttons,
         ]
         .spacing(15)
+        .align_items(Alignment::Center)
+        .width(Length::Fill)
+        .height(Length::Fill)
+        .into()
+    }
+
+    fn render_summary_screen(&self) -> Element<Message> {
+        let back_button = button(text("Back").size(BUTTON_TEXT_SIZE))
+            .on_press(Message::NavigateTo(AppScreen::NameBadge))
+            .padding([5,20])
+            .style(theme_fn(YellowButtonStyle));
+
+        let configure_button_text = if self.is_configuring {
+            "Configuring..."
+        } else if self.configuration_progress >= 1.0 {
+            "Configuration Complete!"
+        } else {
+            "Configure Device"
+        };
+
+        let configure_button_enabled = !self.is_configuring && self.configuration_progress < 1.0;
+        let configure_button_style = if configure_button_enabled { 
+            theme_fn(YellowButtonStyle) 
+        } else { 
+            theme_fn(DisabledButtonStyle) 
+        };
+        
+        let configure_button = button(text(configure_button_text).size(BUTTON_TEXT_SIZE))
+            .on_press_maybe(if configure_button_enabled { Some(Message::StartConfiguration) } else { None })
+            .padding([10, 30])
+            .style(configure_button_style);
+
+        let done_button = button(text("Done").size(BUTTON_TEXT_SIZE))
+            .on_press(Message::NavigateTo(AppScreen::Welcome))
+            .padding([5,20])
+            .style(theme_fn(YellowButtonStyle));
+
+        let bottom_buttons = if self.configuration_progress >= 1.0 {
+            row![
+                back_button,
+                Space::with_width(Length::Fill),
+                done_button,
+            ]
+        } else {
+            row![
+                back_button,
+                Space::with_width(Length::Fill),
+            ]
+        }
+        .spacing(20)
+        .padding(20)
+        .width(Length::Fill);
+
+        // Summary content
+        let selected_image_text = match &self.selected_customize_image {
+            Some(_) => "Custom Image Selected",
+            None => "No Image Selected",
+        };
+
+        let selected_led_text = match &self.selected_led_mode {
+            Some(mode) => mode.display_name(),
+            None => "No LED Pattern Selected",
+        };
+
+        let badge_name_text = if self.badge_name.is_empty() {
+            "No Name Entered"
+        } else {
+            &self.badge_name
+        };
+
+        let summary_content = column![
+            text("Configuration Summary")
+                .size(HEADING_SIZE)
+                .horizontal_alignment(iced::alignment::Horizontal::Center),
+            Space::new(Length::Shrink, Length::Fixed(30.0)),
+            
+            container(
+                column![
+                    row![
+                        text("Badge Image: ").size(BODY_SIZE + 2),
+                        text(selected_image_text).size(BODY_SIZE + 2).style(iced::theme::Text::Color(*BLUE_TEXT)),
+                    ].spacing(10),
+                    Space::new(Length::Shrink, Length::Fixed(15.0)),
+                    row![
+                        text("LED Pattern: ").size(BODY_SIZE + 2),
+                        text(selected_led_text).size(BODY_SIZE + 2).style(iced::theme::Text::Color(*BLUE_TEXT)),
+                    ].spacing(10),
+                    Space::new(Length::Shrink, Length::Fixed(15.0)),
+                    row![
+                        text("Badge Name: ").size(BODY_SIZE + 2),
+                        text(badge_name_text).size(BODY_SIZE + 2).style(iced::theme::Text::Color(*BLUE_TEXT)),
+                    ].spacing(10),
+                ]
+            )
+            .padding(30)
+            .style(theme_fn_container(SummaryBoxStyle)),
+            
+            Space::new(Length::Shrink, Length::Fixed(40.0)),
+            
+            // Configuration section
+            column![
+                text("Device Configuration")
+                    .size(HEADING_SIZE - 5)
+                    .horizontal_alignment(iced::alignment::Horizontal::Center),
+                Space::new(Length::Shrink, Length::Fixed(20.0)),
+                configure_button,
+                Space::new(Length::Shrink, Length::Fixed(20.0)),
+                if self.is_configuring || self.configuration_progress > 0.0 {
+                    container(
+                        column![
+                            progress_bar(0.0..=1.0, self.configuration_progress)
+                                .width(Length::Fixed(400.0))
+                                .height(Length::Fixed(20.0)),
+                            Space::new(Length::Shrink, Length::Fixed(10.0)),
+                            text(format!("{}%", (self.configuration_progress * 100.0) as u32))
+                                .size(16)
+                                .horizontal_alignment(iced::alignment::Horizontal::Center)
+                        ]
+                        .align_items(Alignment::Center)
+                    )
+                    .width(Length::Fill)
+                    .center_x()
+                } else {
+                    container(Space::new(Length::Shrink, Length::Fixed(50.0)))
+                }
+            ]
+            .align_items(Alignment::Center)
+        ]
+        .spacing(10)
+        .align_items(Alignment::Center);
+
+        column![
+            Space::with_height(Length::Fixed(50.0)),
+            summary_content,
+            Space::with_height(Length::Fill),
+            bottom_buttons,
+        ]
+        .spacing(10)
         .align_items(Alignment::Center)
         .width(Length::Fill)
         .height(Length::Fill)
@@ -803,6 +970,22 @@ impl ContainerStyleSheet for DialogBackgroundStyle {
     fn appearance(&self, _style: &Self::Style) -> ContainerAppearance {
         ContainerAppearance {
             background: Some(Color { r: 0.0, g: 0.0, b: 0.0, a: 0.7 }.into()),
+            ..Default::default()
+        }
+    }
+}
+
+struct SummaryBoxStyle;
+impl ContainerStyleSheet for SummaryBoxStyle {
+    type Style = Theme;
+    fn appearance(&self, _style: &Self::Style) -> ContainerAppearance {
+        ContainerAppearance {
+            background: Some(Color::from_rgb(0.95, 0.95, 0.95).into()),
+            border: Border {
+                color: Color::from_rgb(0.7, 0.7, 0.7),
+                width: 1.0,
+                radius: 8.0.into(),
+            },
             ..Default::default()
         }
     }
