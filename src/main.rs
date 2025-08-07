@@ -1166,8 +1166,8 @@ async fn configure_device(
     let config_file = "badge_config.fwi";
     match fs::write(config_file, config_content) {
         Ok(_) => {
-            // Upload the file using fwi-serial
-            match upload_config_file(config_file).await {
+            // Upload the configuration using fwi-serial
+            match upload_configuration(config_file).await {
                 Ok(output) => Ok(format!("Configuration uploaded successfully: {}", output)),
                 Err(e) => Err(format!("Failed to upload configuration: {}", e)),
             }
@@ -1217,7 +1217,7 @@ timestamp={}
     )
 }
 
-async fn upload_config_file(config_file: &str) -> Result<String, String> {
+async fn upload_configuration(config_file: &str) -> Result<String, String> {
     // First, let's read and display the configuration file content for debugging
     match fs::read_to_string(config_file) {
         Ok(content) => {
