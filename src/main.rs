@@ -143,7 +143,7 @@ enum Message {
 pub fn main() -> iced::Result {
     let settings = Settings {
         window: window::Settings {
-            size: Size::new(1000.0, 700.0),
+            size: Size::new(1000.0, 800.0),
             min_size: Some(Size::new(800.0, 500.0)),
             ..window::Settings::default()
         },
@@ -429,17 +429,8 @@ impl BuildABadgeApp {
             .padding([10, 40])
             .style(finish_button_style);
 
-        let bottom_buttons = row![
-            back_button,
-            Space::with_width(Length::Fill),
-            finish_button,
-        ]
-        .spacing(30)
-        .padding(30)
-        .width(Length::Fill);
-
-
-        column![
+        // Create main content without buttons
+        let main_content = column![
             Space::with_height(Length::Fixed(50.0)),
             image(STUFF_ME_ICON.clone())
                 .width(Length::Fixed(120.0))
@@ -466,11 +457,29 @@ impl BuildABadgeApp {
             .align_items(Alignment::Center)
             .width(Length::Fill)
             .height(Length::FillPortion(1)),
-            Space::new(Length::Shrink, Length::Fixed(20.0)),
-            bottom_buttons
         ]
         .spacing(10)
         .align_items(Alignment::Center)
+        .width(Length::Fill);
+
+        // Create bottom navigation buttons positioned at bottom corners
+        let bottom_navigation = container(
+            row![
+                back_button,
+                Space::with_width(Length::Fill),
+                finish_button,
+            ]
+            .align_items(Alignment::Center)
+        )
+        .width(Length::Fill)
+        .padding(20);
+
+        column![
+            container(main_content)
+                .width(Length::Fill)
+                .height(Length::Fill),
+            bottom_navigation
+        ]
         .width(Length::Fill)
         .height(Length::Fill)
         .into()
@@ -486,15 +495,6 @@ impl BuildABadgeApp {
             .on_press(Message::NavigateTo(AppScreen::NameBadge))
             .padding([10, 40])
             .style(theme_fn(YellowButtonStyle));
-
-        let bottom_buttons = row![
-            back_button,
-            Space::with_width(Length::Fill),
-            next_button,
-        ]
-        .spacing(30)
-        .padding(30)
-        .width(Length::Fill);
 
         let modes = [
             LedMode::Off,
@@ -530,7 +530,8 @@ impl BuildABadgeApp {
             },
         );
 
-        column![
+        // Create main content without buttons
+        let main_content = column![
             Space::with_height(Length::Fixed(50.0)),
             image(LIGHT_ME_ICON.clone())
                 .width(Length::Fixed(120.0))
@@ -550,11 +551,29 @@ impl BuildABadgeApp {
             container(radio_buttons)
                 .width(Length::Fill)
                 .center_x(),
-            Space::with_height(Length::Fixed(20.0)),
-            bottom_buttons,
         ]
         .spacing(10)
         .align_items(Alignment::Center)
+        .width(Length::Fill);
+
+        // Create bottom navigation buttons positioned at bottom corners
+        let bottom_navigation = container(
+            row![
+                back_button,
+                Space::with_width(Length::Fill),
+                next_button,
+            ]
+            .align_items(Alignment::Center)
+        )
+        .width(Length::Fill)
+        .padding(20);
+
+        column![
+            container(main_content)
+                .width(Length::Fill)
+                .height(Length::Fill),
+            bottom_navigation
+        ]
         .width(Length::Fill)
         .height(Length::Fill)
         .into()
@@ -570,15 +589,6 @@ impl BuildABadgeApp {
             .on_press(Message::NavigateTo(AppScreen::Summary))
             .padding([10, 40])
             .style(theme_fn(YellowButtonStyle));
-
-        let bottom_buttons = row![
-            back_button,
-            Space::with_width(Length::Fill),
-            submit_button,
-        ]
-        .spacing(20)
-        .padding(20)
-        .width(Length::Fill);
 
         // Create the badge image container with consistent sizing
         let badge_image_container = container(
@@ -639,7 +649,8 @@ impl BuildABadgeApp {
         .center_x()
         .center_y();
 
-        column![
+        // Create main content without buttons
+        let main_content = column![
             Space::with_height(Length::Fixed(30.0)),
             image(PLACE_ME_ICON.clone())
                 .width(Length::Fixed(120.0))
@@ -660,11 +671,29 @@ impl BuildABadgeApp {
             )
             .width(Length::Fill)
             .center_x(),
-            Space::with_height(Length::Fixed(10.0)),
-            bottom_buttons,
         ]
         .spacing(15)
         .align_items(Alignment::Center)
+        .width(Length::Fill);
+
+        // Create bottom navigation buttons positioned at bottom corners
+        let bottom_navigation = container(
+            row![
+                back_button,
+                Space::with_width(Length::Fill),
+                submit_button,
+            ]
+            .align_items(Alignment::Center)
+        )
+        .width(Length::Fill)
+        .padding(20);
+
+        column![
+            container(main_content)
+                .width(Length::Fill)
+                .height(Length::Fill),
+            bottom_navigation
+        ]
         .width(Length::Fill)
         .height(Length::Fill)
         .into()
@@ -698,15 +727,6 @@ impl BuildABadgeApp {
             .on_press(Message::NavigateTo(AppScreen::Welcome))
             .padding([10, 40])
             .style(theme_fn(YellowButtonStyle));
-
-        let bottom_buttons = row![
-            back_button,
-            Space::with_width(Length::Fill),
-            done_button,
-        ]
-        .spacing(20)
-        .padding(20)
-        .width(Length::Fill);
 
         // Summary content
         let selected_image_display = match &self.selected_customize_image {
@@ -749,7 +769,9 @@ impl BuildABadgeApp {
             &self.badge_name
         };
 
-        let summary_content = column![
+        // Create main content without buttons
+        let main_content = column![
+            Space::with_height(Length::Fixed(15.0)),
             text("Configuration Summary")
                 .size(HEADING_SIZE)
                 .horizontal_alignment(iced::alignment::Horizontal::Center),
@@ -829,16 +851,27 @@ impl BuildABadgeApp {
             .align_items(Alignment::Center)
         ]
         .spacing(10)
-        .align_items(Alignment::Center);
+        .align_items(Alignment::Center)
+        .width(Length::Fill);
+
+        // Create bottom navigation buttons positioned at bottom corners
+        let bottom_navigation = container(
+            row![
+                back_button,
+                Space::with_width(Length::Fill),
+                done_button,
+            ]
+            .align_items(Alignment::Center)
+        )
+        .width(Length::Fill)
+        .padding(20);
 
         column![
-            Space::with_height(Length::Fixed(15.0)),
-            summary_content,
-            Space::with_height(Length::Fixed(10.0)),
-            bottom_buttons,
+            container(main_content)
+                .width(Length::Fill)
+                .height(Length::Fill),
+            bottom_navigation
         ]
-        .spacing(15)
-        .align_items(Alignment::Center)
         .width(Length::Fill)
         .height(Length::Fill)
         .into()
