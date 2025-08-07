@@ -73,10 +73,33 @@ enum AppScreen {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum LedMode {
+    Off,
     Rainbow,
+    Snowstorm,
+    RedChase,
+    RainbowChase,
     BlueChase,
     GreenDot,
-    Manual,
+    BlueSin,
+    WhiteFade,
+    Accelerometer,
+}
+
+impl LedMode {
+    fn display_name(&self) -> &'static str {
+        match self {
+            LedMode::Off => "Off",
+            LedMode::Rainbow => "Rainbow",
+            LedMode::Snowstorm => "Snowstorm",
+            LedMode::RedChase => "Red Chase",
+            LedMode::RainbowChase => "Rainbow Chase",
+            LedMode::BlueChase => "Blue Chase",
+            LedMode::GreenDot => "Green Dot",
+            LedMode::BlueSin => "Blue Sin",
+            LedMode::WhiteFade => "White Fade",
+            LedMode::Accelerometer => "Accelerometer",
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -355,7 +378,7 @@ impl BuildABadgeApp {
             );
         }
 
-        let back_button = button(text("Back").size(BODY_SIZE))
+        let back_button = button(text("Back").size(BUTTON_TEXT_SIZE))
             .on_press(Message::NavigateTo(AppScreen::Welcome))
             .padding([5,20])
             .style(theme_fn(YellowButtonStyle));
@@ -372,7 +395,7 @@ impl BuildABadgeApp {
             Message::SelectCustomizeImage(DEFAULT_PLACEHOLDER_IMAGE.clone())
         };
 
-        let finish_button = button(text("Next").size(BODY_SIZE))
+        let finish_button = button(text("Next").size(BUTTON_TEXT_SIZE))
             .on_press_maybe(if finish_button_enabled { Some(finish_button_message) } else { None })
             .padding([5,20])
             .style(finish_button_style);
@@ -425,12 +448,12 @@ impl BuildABadgeApp {
     }
 
     fn render_customize_leds_screen(&self) -> Element<Message> {
-        let back_button = button(text("Back").size(BODY_SIZE))
+        let back_button = button(text("Back").size(BUTTON_TEXT_SIZE))
             .on_press(Message::NavigateTo(AppScreen::CustomizeBadge))
             .padding([5,20])
             .style(theme_fn(YellowButtonStyle));
         
-        let confirm_button = button(text("Confirm").size(BODY_SIZE))
+        let next_button = button(text("Next").size(BUTTON_TEXT_SIZE))
             .on_press(Message::NavigateTo(AppScreen::NameBadge))
             .padding([5,20])
             .style(theme_fn(YellowButtonStyle));
@@ -438,30 +461,43 @@ impl BuildABadgeApp {
         let bottom_buttons = row![
             back_button,
             Space::with_width(Length::Fill),
-            confirm_button,
+            next_button,
         ]
         .spacing(20)
         .padding(20)
         .width(Length::Fill);
 
         let modes = [
+            LedMode::Off,
             LedMode::Rainbow, 
+            LedMode::Snowstorm,
+            LedMode::RedChase,
+            LedMode::RainbowChase,
             LedMode::BlueChase, 
-            LedMode::GreenDot, 
-            LedMode::Manual
+            LedMode::GreenDot,
+            LedMode::BlueSin,
+            LedMode::WhiteFade,
+            LedMode::Accelerometer
         ];
 
-        let radio_row = modes.iter().fold(
-            row!().spacing(20).align_items(Alignment::Center),
-            |row, mode| {
-                row.push(radio(
-                    format!("{:?}", mode),
-                    *mode,
-                    self.selected_led_mode,
-                    Message::SelectLedMode,
-                )
-                .size(BODY_SIZE)
-                .spacing(5))
+        // Create two columns for better layout
+        let radio_buttons = modes.chunks(5).enumerate().fold(
+            row!().spacing(80).align_items(Alignment::Start),
+            |row_acc, (col_idx, chunk)| {
+                let column = chunk.iter().fold(
+                    column!().spacing(18).align_items(Alignment::Start),
+                    |col_acc, mode| {
+                        col_acc.push(radio(
+                            mode.display_name(),
+                            *mode,
+                            self.selected_led_mode,
+                            Message::SelectLedMode,
+                        )
+                        .size(20)
+                        .spacing(10))
+                    },
+                );
+                row_acc.push(column)
             },
         );
 
@@ -482,7 +518,9 @@ impl BuildABadgeApp {
             )
             .padding([0, 50]),
             Space::new(Length::Shrink, Length::Fixed(40.0)),
-            radio_row,
+            container(radio_buttons)
+                .width(Length::Fill)
+                .center_x(),
             Space::with_height(Length::Fill),
             bottom_buttons,
         ]
@@ -494,12 +532,12 @@ impl BuildABadgeApp {
     }
     
     fn render_name_badge_screen(&self) -> Element<Message> {
-        let back_button = button(text("Back").size(BODY_SIZE))
+        let back_button = button(text("Back").size(BUTTON_TEXT_SIZE))
             .on_press(Message::NavigateTo(AppScreen::CustomizeLeds))
             .padding([5,20])
             .style(theme_fn(YellowButtonStyle));
 
-        let submit_button = button(text("Submit").size(BODY_SIZE))
+        let submit_button = button(text("Submit").size(BUTTON_TEXT_SIZE))
             .on_press(Message::NavigateTo(AppScreen::Welcome))
             .padding([5,20])
             .style(theme_fn(YellowButtonStyle));
