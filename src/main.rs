@@ -409,7 +409,7 @@ impl BuildABadgeApp {
 
         let back_button = button(text("Back").size(BUTTON_TEXT_SIZE))
             .on_press(Message::NavigateTo(AppScreen::Welcome))
-            .padding([5,20])
+            .padding([10, 40])
             .style(theme_fn(YellowButtonStyle));
 
         let finish_button_enabled = self.selected_customize_image.is_some();
@@ -426,7 +426,7 @@ impl BuildABadgeApp {
 
         let finish_button = button(text("Next").size(BUTTON_TEXT_SIZE))
             .on_press_maybe(if finish_button_enabled { Some(finish_button_message) } else { None })
-            .padding([5,20])
+            .padding([10, 40])
             .style(finish_button_style);
 
         let bottom_buttons = row![
@@ -434,8 +434,8 @@ impl BuildABadgeApp {
             Space::with_width(Length::Fill),
             finish_button,
         ]
-        .spacing(20)
-        .padding(20)
+        .spacing(30)
+        .padding(30)
         .width(Length::Fill);
 
 
@@ -479,12 +479,12 @@ impl BuildABadgeApp {
     fn render_customize_leds_screen(&self) -> Element<Message> {
         let back_button = button(text("Back").size(BUTTON_TEXT_SIZE))
             .on_press(Message::NavigateTo(AppScreen::CustomizeBadge))
-            .padding([5,20])
+            .padding([10, 40])
             .style(theme_fn(YellowButtonStyle));
         
         let next_button = button(text("Next").size(BUTTON_TEXT_SIZE))
             .on_press(Message::NavigateTo(AppScreen::NameBadge))
-            .padding([5,20])
+            .padding([10, 40])
             .style(theme_fn(YellowButtonStyle));
 
         let bottom_buttons = row![
@@ -492,8 +492,8 @@ impl BuildABadgeApp {
             Space::with_width(Length::Fill),
             next_button,
         ]
-        .spacing(20)
-        .padding(20)
+        .spacing(30)
+        .padding(30)
         .width(Length::Fill);
 
         let modes = [
@@ -550,7 +550,7 @@ impl BuildABadgeApp {
             container(radio_buttons)
                 .width(Length::Fill)
                 .center_x(),
-            Space::with_height(Length::Fill),
+            Space::with_height(Length::Fixed(20.0)),
             bottom_buttons,
         ]
         .spacing(10)
@@ -563,12 +563,12 @@ impl BuildABadgeApp {
     fn render_name_badge_screen(&self) -> Element<Message> {
         let back_button = button(text("Back").size(BUTTON_TEXT_SIZE))
             .on_press(Message::NavigateTo(AppScreen::CustomizeLeds))
-            .padding([5,20])
+            .padding([10, 40])
             .style(theme_fn(YellowButtonStyle));
 
         let submit_button = button(text("Submit").size(BUTTON_TEXT_SIZE))
             .on_press(Message::NavigateTo(AppScreen::Summary))
-            .padding([5,20])
+            .padding([10, 40])
             .style(theme_fn(YellowButtonStyle));
 
         let bottom_buttons = row![
@@ -647,7 +647,7 @@ impl BuildABadgeApp {
             text("Place Me")
                 .size(HEADING_SIZE)
                 .horizontal_alignment(iced::alignment::Horizontal::Center),
-            Space::new(Length::Shrink, Length::Fixed(20.0)),
+            Space::new(Length::Shrink, Length::Fixed(15.0)),
             // Main content area with better proportions
             container(
                 row![
@@ -660,7 +660,7 @@ impl BuildABadgeApp {
             )
             .width(Length::Fill)
             .center_x(),
-            Space::with_height(Length::Fill),
+            Space::with_height(Length::Fixed(10.0)),
             bottom_buttons,
         ]
         .spacing(15)
@@ -673,7 +673,7 @@ impl BuildABadgeApp {
     fn render_summary_screen(&self) -> Element<Message> {
         let back_button = button(text("Back").size(BUTTON_TEXT_SIZE))
             .on_press(Message::NavigateTo(AppScreen::NameBadge))
-            .padding([5,20])
+            .padding([10, 40])
             .style(theme_fn(YellowButtonStyle));
 
         let configure_button_text = if self.is_configuring {
@@ -696,7 +696,7 @@ impl BuildABadgeApp {
 
         let done_button = button(text("Done").size(BUTTON_TEXT_SIZE))
             .on_press(Message::NavigateTo(AppScreen::Welcome))
-            .padding([5,20])
+            .padding([10, 40])
             .style(theme_fn(YellowButtonStyle));
 
         let bottom_buttons = row![
@@ -832,12 +832,12 @@ impl BuildABadgeApp {
         .align_items(Alignment::Center);
 
         column![
-            Space::with_height(Length::Fixed(50.0)),
+            Space::with_height(Length::Fixed(15.0)),
             summary_content,
-            Space::with_height(Length::Fill),
+            Space::with_height(Length::Fixed(10.0)),
             bottom_buttons,
         ]
-        .spacing(10)
+        .spacing(15)
         .align_items(Alignment::Center)
         .width(Length::Fill)
         .height(Length::Fill)
