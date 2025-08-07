@@ -8,6 +8,7 @@ use iced::{
 use iced::window;
 use std::sync::LazyLock;
 use std::time::{Duration, Instant};
+use std::fs;
 
 // Explicitly import necessary types and traits for Iced 0.12.1
 use iced::widget::button::{Appearance as ButtonAppearance, StyleSheet as ButtonStyleSheet};
@@ -120,6 +121,8 @@ struct BuildABadgeApp {
     // Configuration state
     is_configuring: bool,
     configuration_progress: f32,
+    configuration_status: String,
+    configuration_error: Option<String>,
     
     // Animation state
     transition: AppScreenTransition,
@@ -135,6 +138,7 @@ enum Message {
     BadgeNameChanged(String),
     StartConfiguration,
     ConfigurationProgress,
+    ConfigurationComplete(Result<String, String>),
     
     // Animation messages
     Tick(Instant),
@@ -143,7 +147,7 @@ enum Message {
 pub fn main() -> iced::Result {
     let settings = Settings {
         window: window::Settings {
-            size: Size::new(1000.0, 800.0),
+            size: Size::new(1200.0, 900.0),
             min_size: Some(Size::new(800.0, 500.0)),
             ..window::Settings::default()
         },
@@ -171,6 +175,8 @@ impl Application for BuildABadgeApp {
             
             is_configuring: false,
             configuration_progress: 0.0,
+            configuration_status: String::new(),
+            configuration_error: None,
             
             transition: AppScreenTransition::FadingIn,
             current_opacity: 0.0,
@@ -193,6 +199,13 @@ impl Application for BuildABadgeApp {
                 if self.current_screen != screen && self.transition == AppScreenTransition::Idle {
                     self.transition = AppScreenTransition::FadingOut(screen);
                     self.transition_start_time = Instant::now();
+                    
+                    // Clear configuration status when navigating away from summary
+                    if self.current_screen == AppScreen::Summary {
+                        self.configuration_status = String::new();
+                        self.configuration_error = None;
+                        self.configuration_progress = 0.0;
+                    }
                 }
             }
             Message::SelectCustomizeImage(handle) => {
@@ -214,6 +227,18 @@ impl Application for BuildABadgeApp {
             Message::StartConfiguration => {
                 self.is_configuring = true;
                 self.configuration_progress = 0.0;
+                self.configuration_status = "Starting configuration...".to_string();
+                self.configuration_error = None;
+                
+                // Create configuration and upload it
+                return Command::perform(
+                    configure_device(
+                        self.selected_customize_image.clone(),
+                        self.selected_led_mode,
+                        self.badge_name.clone()
+                    ),
+                    Message::ConfigurationComplete
+                );
             }
             Message::ConfigurationProgress => {
                 if self.is_configuring && self.configuration_progress < 1.0 {
@@ -221,6 +246,23 @@ impl Application for BuildABadgeApp {
                     if self.configuration_progress >= 1.0 {
                         self.configuration_progress = 1.0;
                         self.is_configuring = false;
+                    }
+                }
+            }
+            Message::ConfigurationComplete(result) => {
+                self.is_configuring = false;
+                self.configuration_progress = 1.0;
+                
+                match result {
+                    Ok(message) => {
+                        println!("Configuration successful: {}", message);
+                        self.configuration_status = "Configuration successful!".to_string();
+                        self.configuration_error = None;
+                    }
+                    Err(error) => {
+                        println!("Configuration failed: {}", error);
+                        self.configuration_status = "Configuration failed".to_string();
+                        self.configuration_error = Some(error);
                     }
                 }
             }
@@ -824,26 +866,45 @@ impl BuildABadgeApp {
                 configure_button,
                 Space::new(Length::Shrink, Length::Fixed(20.0)),
                 if self.is_configuring || self.configuration_progress > 0.0 {
-                    let status_text = if self.configuration_progress >= 1.0 && !self.is_configuring {
+                    let status_text = if self.is_configuring {
+                        &self.configuration_status
+                    } else if self.configuration_error.is_some() {
+                        "Configuration failed - see details below"
+                    } else if self.configuration_progress >= 1.0 {
                         "Configuration Complete! You can configure again anytime."
                     } else {
                         &format!("{}%", (self.configuration_progress * 100.0) as u32)
                     };
                     
-                    container(
-                        column![
-                            progress_bar(0.0..=1.0, self.configuration_progress)
-                                .width(Length::Fixed(400.0))
-                                .height(Length::Fixed(20.0)),
-                            Space::new(Length::Shrink, Length::Fixed(10.0)),
-                            text(status_text)
-                                .size(16)
-                                .horizontal_alignment(iced::alignment::Horizontal::Center)
-                        ]
-                        .align_items(Alignment::Center)
-                    )
-                    .width(Length::Fill)
-                    .center_x()
+                    let mut status_column = column![
+                        progress_bar(0.0..=1.0, self.configuration_progress)
+                            .width(Length::Fixed(400.0))
+                            .height(Length::Fixed(20.0)),
+                        Space::new(Length::Shrink, Length::Fixed(10.0)),
+                        text(status_text)
+                            .size(16)
+                            .horizontal_alignment(iced::alignment::Horizontal::Center)
+                    ];
+                    
+                    // Add error message if there's an error
+                    if let Some(error) = &self.configuration_error {
+                        status_column = status_column.push(Space::new(Length::Shrink, Length::Fixed(10.0)));
+                        status_column = status_column.push(
+                            container(
+                                text(error)
+                                    .size(14)
+                                    .style(iced::theme::Text::Color(Color::from_rgb8(200, 0, 0)))
+                                    .horizontal_alignment(iced::alignment::Horizontal::Center)
+                            )
+                            .width(Length::Fixed(400.0))
+                            .padding(10)
+                            .style(theme_fn_container(ErrorBoxStyle))
+                        );
+                    }
+                    
+                    container(status_column.align_items(Alignment::Center))
+                        .width(Length::Fill)
+                        .center_x()
                 } else {
                     container(Space::new(Length::Shrink, Length::Fixed(50.0)))
                 }
@@ -1060,6 +1121,22 @@ impl ContainerStyleSheet for SummaryBoxStyle {
     }
 }
 
+struct ErrorBoxStyle;
+impl ContainerStyleSheet for ErrorBoxStyle {
+    type Style = Theme;
+    fn appearance(&self, _style: &Self::Style) -> ContainerAppearance {
+        ContainerAppearance {
+            background: Some(Color::from_rgb(1.0, 0.95, 0.95).into()),
+            border: Border {
+                color: Color::from_rgb8(200, 0, 0),
+                width: 1.0,
+                radius: 4.0.into(),
+            },
+            ..Default::default()
+        }
+    }
+}
+
 fn theme_fn<T>(style: T) -> iced::theme::Button
 where
     T: ButtonStyleSheet<Style = Theme> + 'static,
@@ -1074,4 +1151,104 @@ where
     T::Style: Sized,
 {
     iced::theme::Container::Custom(Box::new(style))
+}
+
+// Configuration function for device setup
+async fn configure_device(
+    selected_image: Option<image::Handle>,
+    selected_led_mode: Option<LedMode>,
+    badge_name: String,
+) -> Result<String, String> {
+    // Create configuration content
+    let config_content = create_config_content(selected_image, selected_led_mode, badge_name);
+    
+    // Write configuration to file
+    let config_file = "badge_config.fwi";
+    match fs::write(config_file, config_content) {
+        Ok(_) => {
+            // Upload the file using fwi-serial
+            match upload_config_file(config_file).await {
+                Ok(output) => Ok(format!("Configuration uploaded successfully: {}", output)),
+                Err(e) => Err(format!("Failed to upload configuration: {}", e)),
+            }
+        }
+        Err(e) => Err(format!("Failed to write configuration file: {}", e)),
+    }
+}
+
+fn create_config_content(
+    selected_image: Option<image::Handle>,
+    selected_led_mode: Option<LedMode>,
+    badge_name: String,
+) -> String {
+    let image_name = match selected_image {
+        Some(_) => "selected_image.png", // In a real implementation, you'd map the handle to actual image name
+        None => "default.png",
+    };
+    
+    let led_pattern = match selected_led_mode {
+        Some(mode) => mode.display_name(),
+        None => "Off",
+    };
+    
+    let name = if badge_name.is_empty() {
+        "Badge"
+    } else {
+        &badge_name
+    };
+    
+    format!(
+        r#"# Badge Configuration File
+[DISPLAY]
+image={image_name}
+name={name}
+
+[LED]
+pattern={led_pattern}
+
+[SETTINGS]
+version=1.0
+timestamp={}
+"#,
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs()
+    )
+}
+
+async fn upload_config_file(config_file: &str) -> Result<String, String> {
+    // First, let's read and display the configuration file content for debugging
+    match fs::read_to_string(config_file) {
+        Ok(content) => {
+            println!("Generated configuration file content:");
+            println!("{}", content);
+        }
+        Err(_) => {
+            println!("Could not read configuration file for preview");
+        }
+    }
+    
+    // Execute fwi-serial command
+    let output = tokio::process::Command::new("fwi-serial")
+        .arg("-s")
+        .arg(config_file)
+        .arg("-fn")
+        .arg("/images/badge.fwi")
+        .output()
+        .await;
+    
+    match output {
+        Ok(result) => {
+            if result.status.success() {
+                Ok(String::from_utf8_lossy(&result.stdout).to_string())
+            } else {
+                let stderr = String::from_utf8_lossy(&result.stderr);
+                // For development, let's show what the command tried to do
+                println!("fwi-serial command executed: fwi-serial -s {} -fn /images/badge.fwi", config_file);
+                Err(stderr.to_string())
+            }
+        }
+        Err(e) => Err(format!("Failed to execute fwi-serial: {}", e)),
+    }
 }
