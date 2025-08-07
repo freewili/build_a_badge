@@ -114,6 +114,25 @@ impl LedMode {
             LedMode::Accel => "Accelerometer",
         }
     }
+
+    fn as_integer(&self) -> u8 {
+        match self {
+            LedMode::Manual => 0,
+            LedMode::Rainbow => 1,
+            LedMode::Snowstorm => 2,
+            LedMode::RedChase => 3,
+            LedMode::RainbowChase => 4,
+            LedMode::BlueChase => 5,
+            LedMode::GreenDot => 6,
+            LedMode::BlueDot => 7,
+            LedMode::BlueSin => 8,
+            LedMode::WhiteFade => 9,
+            LedMode::BarGraph => 10,
+            LedMode::Zylon => 11,
+            LedMode::Audio => 12,
+            LedMode::Accel => 13,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -1535,11 +1554,78 @@ fn configuration_subscription(
                             }
                         };
 
+                        if !success {
+                            return (
+                                Message::ConfigurationComplete(Err(final_message)),
+                                ConfigurationState::Done,
+                            );
+                        }
+
+                        (
+                            Message::ConfigurationStepUpdate("Step 5: Running WASM application...".to_string(), 0.9),
+                            ConfigurationState::RunWasm,
+                        )
+                    }
+                    ConfigurationState::RunWasm => {
+                        // Step 5: Run WASM application
+                        println!("Configuration: Starting WASM application execution");
+                        
+                        let result = tokio::time::timeout(
+                            Duration::from_secs(30),
+                            tokio::process::Command::new("fwi-serial")
+                                .arg("-w")
+                                .arg("build_a_badge.wasm")
+                                .output()
+                        ).await;
+
+                        let (success, final_message) = match result {
+                            Ok(Ok(output)) => {
+                                let console_output = format!("Configuration: fwi-serial WASM run completed with exit status: {}", output.status);
+                                println!("{}", console_output);
+                                
+                                let mut full_output = console_output;
+                                
+                                if !output.stdout.is_empty() {
+                                    let stdout_output = format!("Configuration: stdout: {}", String::from_utf8_lossy(&output.stdout));
+                                    println!("{}", stdout_output);
+                                    full_output.push_str(&format!("\n{}", stdout_output));
+                                }
+                                if !output.stderr.is_empty() {
+                                    let stderr_output = format!("Configuration: stderr: {}", String::from_utf8_lossy(&output.stderr));
+                                    println!("{}", stderr_output);
+                                    full_output.push_str(&format!("\n{}", stderr_output));
+                                }
+                                
+                                if output.status.success() {
+                                    let success_msg = "✓ WASM application executed successfully".to_string();
+                                    let final_msg = format!("{}\nConfiguration: {}", full_output, success_msg);
+                                    println!("Configuration: {}", success_msg);
+                                    (true, final_msg)
+                                } else {
+                                    let stderr = String::from_utf8_lossy(&output.stderr);
+                                    let error_msg = format!("✗ WASM execution failed: {}\nConfiguration stopped due to error.", stderr);
+                                    let final_msg = format!("{}\nConfiguration ERROR: {}", full_output, error_msg);
+                                    println!("Configuration ERROR: {}", error_msg);
+                                    (false, final_msg)
+                                }
+                            }
+                            Ok(Err(e)) => {
+                                let msg = format!("✗ WASM execution error: {}\nConfiguration stopped due to error.", e);
+                                println!("Configuration ERROR: {}", msg);
+                                (false, msg)
+                            },
+                            Err(_) => {
+                                let msg = "✗ WASM execution timed out (30 seconds) - device may not be connected\nConfiguration stopped due to error.".to_string();
+                                println!("Configuration ERROR: {}", msg);
+                                (false, msg)
+                            }
+                        };
+
                         let result = if success {
                             println!("Configuration: All steps completed successfully!");
                             Ok("Configuration completed successfully!".to_string())
                         } else {
-                            println!("Configuration: Process failed during settings upload");
+                            println!("Configuration: Process failed during WASM execution");
                             Err(final_message)
                         };
 
@@ -1566,17 +1652,18 @@ enum ConfigurationState {
     UploadImage,
     UploadWasm,
     UploadSettings,
+    RunWasm,
     Done,
 }
 
 fn create_config_content(selected_led_mode: Option<LedMode>, badge_name: String) -> String {
     let led_pattern = match selected_led_mode {
-        Some(mode) => mode.display_name(),
-        None => "Manual",
+        Some(mode) => mode.as_integer().to_string(),
+        None => "0".to_string(), // Default to Manual (0)
     };
 
     let name = if badge_name.is_empty() {
-        "Free"
+        "Boring"
     } else {
         &badge_name
     };
@@ -1586,11 +1673,11 @@ fn create_config_content(selected_led_mode: Option<LedMode>, badge_name: String)
 
 fn create_settings_content(badge_name: String) -> String {
     format!(
-        "wifiAPEn=1\n
-wifiAPssid={badge_name}-WiLi\n
-wifiAPAuth=0\n
-btEn=1\n
-btAPen={badge_name}-WiLi\n
+        "wifiAPEn=1
+wifiAPssid={badge_name}-WiLi
+wifiAPAuth=0
+btEn=1
+btAPen={badge_name}-WiLi
 btTerm=1\n"
     )
 }
