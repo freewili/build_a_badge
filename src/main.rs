@@ -244,11 +244,11 @@ impl BuildABadgeApp {
     .padding([10, 40])
     .style(theme_fn(YellowButtonStyle));
 
-    // Create a container for the logo with a fixed height to control its size
+    // Create a container for the logo with a smaller, responsive height
     let app_logo_container = container(
         image(APP_LOGO_IMAGE.clone())
-            .width(Length::Fixed(400.0)) // Set a fixed width
-            .height(Length::Fixed(400.0)) // Set a fixed height
+            .width(Length::Fixed(300.0)) // Reduced from 400 to 300
+            .height(Length::Fixed(250.0)) // Reduced from 400 to 250
             .content_fit(ContentFit::ScaleDown) // Ensure the image scales down
     )
     .width(Length::Fill) // Make the container fill the width
@@ -257,28 +257,28 @@ impl BuildABadgeApp {
     .center_y();
 
     column![
-        Space::new(Length::Shrink, Length::Fixed(50.0)),
+        Space::new(Length::Shrink, Length::Fixed(20.0)), // Reduced from 50
         app_logo_container,
-        Space::new(Length::Shrink, Length::Fixed(20.0)),
+        Space::new(Length::Shrink, Length::Fixed(15.0)), // Reduced from 20
         container::<_, Theme, iced::Renderer>(
             text("Welcome to the Build-A-Badge Workshop, where creativity and fun come alive for all! Dive into a vibrant space that sparks your imagination, encourages discovery, and empowers you to craft a unique DEFCON badge—along with memories to cherish forever.")
             .width(Length::Fill)
             .horizontal_alignment(iced::alignment::Horizontal::Center)
             .size(BODY_SIZE)
         )
-        .padding([0, 100]),
-        Space::new(Length::Shrink, Length::Fixed(20.0)),
+        .padding([0, 80]), // Reduced horizontal padding from 100 to 80
+        Space::new(Length::Shrink, Length::Fixed(10.0)), // Reduced from 20
         container::<_, Theme, iced::Renderer>(
-            text("What’s in store? Get ready to hack your ICS Village Badge with a hands-on, interactive experience! You’ll create custom script and design your very own application, guided every step of the way by a friendly ICS Village Badge Builder associate.")
+            text("What's in store? Get ready to hack your ICS Village Badge with a hands-on, interactive experience! You'll create custom script and design your very own application, guided every step of the way by a friendly ICS Village Badge Builder associate.")
             .width(Length::Fill)
             .horizontal_alignment(iced::alignment::Horizontal::Center)
             .size(BODY_SIZE)
         )
-        .padding([0, 100]),
-        Space::new(Length::Shrink, Length::Fixed(40.0)),
+        .padding([0, 80]), // Reduced horizontal padding from 100 to 80
+        Space::new(Length::Shrink, Length::Fixed(20.0)), // Reduced from 40
         start_button
     ]
-    .spacing(20)
+    .spacing(15) // Reduced from 20
     .align_items(Alignment::Center)
     .width(Length::Fill)
     .height(Length::Fill)
