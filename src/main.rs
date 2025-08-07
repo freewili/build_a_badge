@@ -164,7 +164,7 @@ impl Application for BuildABadgeApp {
         let app_state = Self {
             current_screen: AppScreen::Welcome,
             selected_customize_image: None,
-            selected_led_mode: None,
+            selected_led_mode: Some(LedMode::Accelerometer), // Default to Accelerometer
             badge_name: String::new(),
 
             is_configuring: false,
@@ -860,44 +860,63 @@ impl BuildABadgeApp {
                             .horizontal_alignment(iced::alignment::Horizontal::Center)
                     ];
 
-                    // Add console output if there's any
-                    if !self.configuration_console_output.is_empty() {
+                    // Add console output and error display side by side if there's any
+                    let has_console = !self.configuration_console_output.is_empty();
+                    let has_error = self.configuration_error.is_some();
+                    
+                    if has_console || has_error {
                         status_column = status_column.push(Space::new(Length::Shrink, Length::Fixed(15.0)));
-                        status_column = status_column.push(
-                            text("Console Output:")
-                                .size(14)
-                                .style(iced::theme::Text::Color(*BLUE_TEXT))
-                        );
-                        status_column = status_column.push(Space::new(Length::Shrink, Length::Fixed(5.0)));
-                        status_column = status_column.push(
-                            container(
-                                text(&self.configuration_console_output)
-                                    .size(12)
-                                    .style(iced::theme::Text::Color(Color::from_rgb(0.9, 0.9, 0.9)))
-                                    .horizontal_alignment(iced::alignment::Horizontal::Left)
-                            )
-                            .width(Length::Fixed(600.0))
-                            .height(Length::Fixed(200.0))
-                            .padding(10)
-                            .style(theme_fn_container(ConsoleOutputStyle))
-                        );
-                    }
-
-                    // Add error message if there's an error
-                    if let Some(error) = &self.configuration_error {
-                        status_column =
-                            status_column.push(Space::new(Length::Shrink, Length::Fixed(10.0)));
-                        status_column = status_column.push(
-                            container(
-                                text(error)
+                        
+                        // Create a horizontal row for console and error
+                        let mut console_row = row!().spacing(20).align_items(Alignment::Start);
+                        
+                        // Add console output if present
+                        if has_console {
+                            let console_column = column![
+                                text("Console Output:")
                                     .size(14)
-                                    .style(iced::theme::Text::Color(Color::from_rgb8(200, 0, 0)))
-                                    .horizontal_alignment(iced::alignment::Horizontal::Center),
-                            )
-                            .width(Length::Fixed(400.0))
-                            .padding(10)
-                            .style(theme_fn_container(ErrorBoxStyle)),
-                        );
+                                    .style(iced::theme::Text::Color(*BLUE_TEXT)),
+                                Space::new(Length::Shrink, Length::Fixed(5.0)),
+                                container(
+                                    text(&self.configuration_console_output)
+                                        .size(12)
+                                        .style(iced::theme::Text::Color(Color::from_rgb(0.9, 0.9, 0.9)))
+                                        .horizontal_alignment(iced::alignment::Horizontal::Left)
+                                )
+                                .width(Length::Fixed(if has_error { 480.0 } else { 800.0 }))
+                                .height(Length::Fixed(250.0))
+                                .padding(10)
+                                .style(theme_fn_container(ConsoleOutputStyle))
+                            ]
+                            .spacing(5);
+                            
+                            console_row = console_row.push(console_column);
+                        }
+                        
+                        // Add error message if present
+                        if let Some(error) = &self.configuration_error {
+                            let error_column = column![
+                                text("Error:")
+                                    .size(14)
+                                    .style(iced::theme::Text::Color(Color::from_rgb8(200, 0, 0))),
+                                Space::new(Length::Shrink, Length::Fixed(5.0)),
+                                container(
+                                    text(error)
+                                        .size(14)
+                                        .style(iced::theme::Text::Color(Color::from_rgb8(200, 0, 0)))
+                                        .horizontal_alignment(iced::alignment::Horizontal::Left),
+                                )
+                                .width(Length::Fixed(if has_console { 480.0 } else { 800.0 }))
+                                .height(Length::Fixed(250.0))
+                                .padding(10)
+                                .style(theme_fn_container(ErrorBoxStyle))
+                            ]
+                            .spacing(5);
+                            
+                            console_row = console_row.push(error_column);
+                        }
+                        
+                        status_column = status_column.push(console_row);
                     }
 
                     container(status_column.align_items(Alignment::Center))
@@ -1144,10 +1163,11 @@ fn configuration_subscription(
                         }
                         println!("Configuration: Successfully wrote settings file");
 
-                        let step_message = format!("Generated configuration file content:\n{}\nStep 1: Uploading configuration file...", config_content);
-                        println!("Configuration: {}", step_message);
+                        let step_message = "Step 1: Uploading configuration file...";
+                        let detailed_message = format!("Generated configuration file content:\n{}\nStep 1: Uploading configuration file...", config_content);
+                        println!("Configuration: {}", detailed_message);
                         (
-                            Message::ConfigurationStepUpdate(step_message, 0.1),
+                            Message::ConfigurationStepUpdate(step_message.to_string(), 0.1),
                             ConfigurationState::UploadConfig,
                         )
                     }
@@ -1170,23 +1190,33 @@ fn configuration_subscription(
 
                         let (success, message) = match result {
                             Ok(Ok(output)) => {
-                                println!("Configuration: fwi-serial command completed with exit status: {}", output.status);
+                                let console_output = format!("Configuration: fwi-serial command completed with exit status: {}", output.status);
+                                println!("{}", console_output);
+                                
+                                let mut full_output = console_output;
+                                
                                 if !output.stdout.is_empty() {
-                                    println!("Configuration: stdout: {}", String::from_utf8_lossy(&output.stdout));
+                                    let stdout_output = format!("Configuration: stdout: {}", String::from_utf8_lossy(&output.stdout));
+                                    println!("{}", stdout_output);
+                                    full_output.push_str(&format!("\n{}", stdout_output));
                                 }
                                 if !output.stderr.is_empty() {
-                                    println!("Configuration: stderr: {}", String::from_utf8_lossy(&output.stderr));
+                                    let stderr_output = format!("Configuration: stderr: {}", String::from_utf8_lossy(&output.stderr));
+                                    println!("{}", stderr_output);
+                                    full_output.push_str(&format!("\n{}", stderr_output));
                                 }
                                 
                                 if output.status.success() {
-                                    let msg = "✓ Configuration file uploaded successfully\nStep 2: Uploading image file...".to_string();
-                                    println!("Configuration: {}", msg);
-                                    (true, msg)
+                                    let success_msg = "✓ Configuration file uploaded successfully\nStep 2: Uploading image file...".to_string();
+                                    let final_msg = format!("{}\nConfiguration: {}", full_output, success_msg);
+                                    println!("Configuration: {}", success_msg);
+                                    (true, final_msg)
                                 } else {
                                     let stderr = String::from_utf8_lossy(&output.stderr);
-                                    let msg = format!("✗ Configuration upload failed: {}\nConfiguration stopped due to error.", stderr);
-                                    println!("Configuration ERROR: {}", msg);
-                                    (false, msg)
+                                    let error_msg = format!("✗ Configuration upload failed: {}\nConfiguration stopped due to error.", stderr);
+                                    let final_msg = format!("{}\nConfiguration ERROR: {}", full_output, error_msg);
+                                    println!("Configuration ERROR: {}", error_msg);
+                                    (false, final_msg)
                                 }
                             }
                             Ok(Err(e)) => {
@@ -1211,7 +1241,7 @@ fn configuration_subscription(
                         }
 
                         (
-                            Message::ConfigurationStepUpdate(message, 0.3),
+                            Message::ConfigurationStepUpdate("Step 2: Uploading image file...".to_string(), 0.3),
                             ConfigurationState::UploadImage,
                         )
                     }
@@ -1231,23 +1261,33 @@ fn configuration_subscription(
 
                         let (success, message) = match result {
                             Ok(Ok(output)) => {
-                                println!("Configuration: fwi-serial image upload completed with exit status: {}", output.status);
+                                let console_output = format!("Configuration: fwi-serial image upload completed with exit status: {}", output.status);
+                                println!("{}", console_output);
+                                
+                                let mut full_output = console_output;
+                                
                                 if !output.stdout.is_empty() {
-                                    println!("Configuration: stdout: {}", String::from_utf8_lossy(&output.stdout));
+                                    let stdout_output = format!("Configuration: stdout: {}", String::from_utf8_lossy(&output.stdout));
+                                    println!("{}", stdout_output);
+                                    full_output.push_str(&format!("\n{}", stdout_output));
                                 }
                                 if !output.stderr.is_empty() {
-                                    println!("Configuration: stderr: {}", String::from_utf8_lossy(&output.stderr));
+                                    let stderr_output = format!("Configuration: stderr: {}", String::from_utf8_lossy(&output.stderr));
+                                    println!("{}", stderr_output);
+                                    full_output.push_str(&format!("\n{}", stderr_output));
                                 }
                                 
                                 if output.status.success() {
-                                    let msg = "✓ Image file uploaded successfully\nStep 3: Uploading WASM file...".to_string();
-                                    println!("Configuration: {}", msg);
-                                    (true, msg)
+                                    let success_msg = "✓ Image file uploaded successfully\nStep 3: Uploading WASM file...".to_string();
+                                    let final_msg = format!("{}\nConfiguration: {}", full_output, success_msg);
+                                    println!("Configuration: {}", success_msg);
+                                    (true, final_msg)
                                 } else {
                                     let stderr = String::from_utf8_lossy(&output.stderr);
-                                    let msg = format!("✗ Image upload failed: {}\nConfiguration stopped due to error.", stderr);
-                                    println!("Configuration ERROR: {}", msg);
-                                    (false, msg)
+                                    let error_msg = format!("✗ Image upload failed: {}\nConfiguration stopped due to error.", stderr);
+                                    let final_msg = format!("{}\nConfiguration ERROR: {}", full_output, error_msg);
+                                    println!("Configuration ERROR: {}", error_msg);
+                                    (false, final_msg)
                                 }
                             }
                             Ok(Err(e)) => {
@@ -1270,7 +1310,7 @@ fn configuration_subscription(
                         }
 
                         (
-                            Message::ConfigurationStepUpdate(message, 0.5),
+                            Message::ConfigurationStepUpdate("Step 3: Uploading WASM file...".to_string(), 0.5),
                             ConfigurationState::UploadWasm,
                         )
                     }
@@ -1286,24 +1326,34 @@ fn configuration_subscription(
                                 .output()
                         ).await;
 
-                        let message = match result {
+                        let _message = match result {
                             Ok(Ok(output)) => {
-                                println!("Configuration: fwi-serial WASM upload completed with exit status: {}", output.status);
+                                let console_output = format!("Configuration: fwi-serial WASM upload completed with exit status: {}", output.status);
+                                println!("{}", console_output);
+                                
+                                let mut full_output = console_output;
+                                
                                 if !output.stdout.is_empty() {
-                                    println!("Configuration: stdout: {}", String::from_utf8_lossy(&output.stdout));
+                                    let stdout_output = format!("Configuration: stdout: {}", String::from_utf8_lossy(&output.stdout));
+                                    println!("{}", stdout_output);
+                                    full_output.push_str(&format!("\n{}", stdout_output));
                                 }
                                 if !output.stderr.is_empty() {
-                                    println!("Configuration: stderr: {}", String::from_utf8_lossy(&output.stderr));
+                                    let stderr_output = format!("Configuration: stderr: {}", String::from_utf8_lossy(&output.stderr));
+                                    println!("{}", stderr_output);
+                                    full_output.push_str(&format!("\n{}", stderr_output));
                                 }
                                 
                                 if output.status.success() {
                                     let msg = "✓ WASM file uploaded successfully\nStep 4: Uploading settings file...".to_string();
+                                    let final_msg = format!("{}\nConfiguration: {}", full_output, msg);
                                     println!("Configuration: {}", msg);
-                                    msg
+                                    final_msg
                                 } else {
                                     let msg = "✗ WASM upload failed (expected - file doesn't exist yet)\nStep 4: Uploading settings file...".to_string();
+                                    let final_msg = format!("{}\nConfiguration: {}", full_output, msg);
                                     println!("Configuration: {}", msg);
-                                    msg
+                                    final_msg
                                 }
                             }
                             Ok(Err(e)) => {
@@ -1320,7 +1370,7 @@ fn configuration_subscription(
 
                         // WASM failure is expected and doesn't stop the process
                         (
-                            Message::ConfigurationStepUpdate(message, 0.7),
+                            Message::ConfigurationStepUpdate("Step 4: Uploading settings file...".to_string(), 0.7),
                             ConfigurationState::UploadSettings,
                         )
                     }
@@ -1342,23 +1392,33 @@ fn configuration_subscription(
 
                         let (success, final_message) = match result {
                             Ok(Ok(output)) => {
-                                println!("Configuration: fwi-serial settings upload completed with exit status: {}", output.status);
+                                let console_output = format!("Configuration: fwi-serial settings upload completed with exit status: {}", output.status);
+                                println!("{}", console_output);
+                                
+                                let mut full_output = console_output;
+                                
                                 if !output.stdout.is_empty() {
-                                    println!("Configuration: stdout: {}", String::from_utf8_lossy(&output.stdout));
+                                    let stdout_output = format!("Configuration: stdout: {}", String::from_utf8_lossy(&output.stdout));
+                                    println!("{}", stdout_output);
+                                    full_output.push_str(&format!("\n{}", stdout_output));
                                 }
                                 if !output.stderr.is_empty() {
-                                    println!("Configuration: stderr: {}", String::from_utf8_lossy(&output.stderr));
+                                    let stderr_output = format!("Configuration: stderr: {}", String::from_utf8_lossy(&output.stderr));
+                                    println!("{}", stderr_output);
+                                    full_output.push_str(&format!("\n{}", stderr_output));
                                 }
                                 
                                 if output.status.success() {
-                                    let msg = "✓ Settings file uploaded successfully".to_string();
-                                    println!("Configuration: {}", msg);
-                                    (true, msg)
+                                    let success_msg = "✓ Settings file uploaded successfully".to_string();
+                                    let final_msg = format!("{}\nConfiguration: {}", full_output, success_msg);
+                                    println!("Configuration: {}", success_msg);
+                                    (true, final_msg)
                                 } else {
                                     let stderr = String::from_utf8_lossy(&output.stderr);
-                                    let msg = format!("✗ Settings upload failed: {}\nConfiguration stopped due to error.", stderr);
-                                    println!("Configuration ERROR: {}", msg);
-                                    (false, msg)
+                                    let error_msg = format!("✗ Settings upload failed: {}\nConfiguration stopped due to error.", stderr);
+                                    let final_msg = format!("{}\nConfiguration ERROR: {}", full_output, error_msg);
+                                    println!("Configuration ERROR: {}", error_msg);
+                                    (false, final_msg)
                                 }
                             }
                             Ok(Err(e)) => {
