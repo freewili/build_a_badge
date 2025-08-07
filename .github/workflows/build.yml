@@ -30,7 +30,11 @@ jobs:
           - os: macos-latest
             target: x86_64-apple-darwin
             binary_ext: ""
-            artifact_name: build-a-badge-macos
+            artifact_name: build-a-badge-macos-intel
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            binary_ext: ""
+            artifact_name: build-a-badge-macos-arm64
 
     steps:
     - name: Checkout code
@@ -186,12 +190,22 @@ jobs:
         asset_name: build-a-badge-windows.zip
         asset_content_type: application/zip
 
-    - name: Upload macOS artifact to release
+    - name: Upload macOS Intel artifact to release
       uses: actions/upload-release-asset@v1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         upload_url: ${{ github.event.release.upload_url }}
-        asset_path: ./artifacts/build-a-badge-macos/build-a-badge-macos.tar.gz
-        asset_name: build-a-badge-macos.tar.gz
+        asset_path: ./artifacts/build-a-badge-macos-intel/build-a-badge-macos-intel.tar.gz
+        asset_name: build-a-badge-macos-intel.tar.gz
+        asset_content_type: application/gzip
+
+    - name: Upload macOS ARM64 artifact to release
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ github.event.release.upload_url }}
+        asset_path: ./artifacts/build-a-badge-macos-arm64/build-a-badge-macos-arm64.tar.gz
+        asset_name: build-a-badge-macos-arm64.tar.gz
         asset_content_type: application/gzip

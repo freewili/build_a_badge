@@ -1,0 +1,6 @@
+wifiAPEn=1
+wifiAPssid=-WiLi
+wifiAPAuth=0
+btEn=1
+btAPen=-WiLi
+btTerm=1

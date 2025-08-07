@@ -30,7 +30,8 @@ Download the latest release for your platform from the [Releases](https://github
 
 - **Linux**: `build-a-badge-linux.tar.gz`
 - **Windows**: `build-a-badge-windows.zip`
-- **macOS**: `build-a-badge-macos.tar.gz`
+- **macOS (Intel)**: `build-a-badge-macos-intel.tar.gz`
+- **macOS (Apple Silicon)**: `build-a-badge-macos-arm64.tar.gz`
 
 Extract the archive and run the `build_a_badge` executable.
 
@@ -115,7 +116,7 @@ The application supports 14 different LED patterns:
 
 - Compatible badge device with `fwi-serial` support
 - USB connection for device programming
-- Windows 10+, macOS 10.14+, or modern Linux distribution
+- Windows 10+, macOS 10.14+ (Intel) / macOS 11+ (Apple Silicon), or modern Linux distribution
 
 ## Configuration Files
 

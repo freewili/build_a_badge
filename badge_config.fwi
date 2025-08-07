@@ -1,0 +1,11 @@
+# Badge Configuration File
+[DISPLAY]
+image=selected_image.png
+name=asdfasdf
+
+[LED]
+pattern=Blue Sin
+
+[SETTINGS]
+version=1.0
+timestamp=1754534599
