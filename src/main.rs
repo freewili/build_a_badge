@@ -79,31 +79,39 @@ enum AppScreen {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum LedMode {
-    Off,
+    Manual,
     Rainbow,
     Snowstorm,
     RedChase,
     RainbowChase,
     BlueChase,
     GreenDot,
+    BlueDot,
     BlueSin,
     WhiteFade,
-    Accelerometer,
+    BarGraph,
+    Zylon,
+    Audio,
+    Accel,
 }
 
 impl LedMode {
     fn display_name(&self) -> &'static str {
         match self {
-            LedMode::Off => "Off",
+            LedMode::Manual => "Manual",
             LedMode::Rainbow => "Rainbow",
             LedMode::Snowstorm => "Snowstorm",
             LedMode::RedChase => "Red Chase",
             LedMode::RainbowChase => "Rainbow Chase",
             LedMode::BlueChase => "Blue Chase",
             LedMode::GreenDot => "Green Dot",
+            LedMode::BlueDot => "Blue Dot",
             LedMode::BlueSin => "Blue Sin",
             LedMode::WhiteFade => "White Fade",
-            LedMode::Accelerometer => "Accelerometer",
+            LedMode::BarGraph => "Bar Graph",
+            LedMode::Zylon => "Zylon",
+            LedMode::Audio => "Audio",
+            LedMode::Accel => "Accelerometer",
         }
     }
 }
@@ -170,7 +178,7 @@ impl Application for BuildABadgeApp {
         let app_state = Self {
             current_screen: AppScreen::Welcome,
             selected_customize_image: None,
-            selected_led_mode: Some(LedMode::Accelerometer), // Default to Accelerometer
+            selected_led_mode: Some(LedMode::Accel), // Default to Accelerometer
             badge_name: String::new(),
 
             is_configuring: false,
@@ -581,20 +589,24 @@ impl BuildABadgeApp {
             .style(theme_fn(YellowButtonStyle));
 
         let modes = [
-            LedMode::Off,
+            LedMode::Manual,
             LedMode::Rainbow,
             LedMode::Snowstorm,
             LedMode::RedChase,
             LedMode::RainbowChase,
             LedMode::BlueChase,
             LedMode::GreenDot,
+            LedMode::BlueDot,
             LedMode::BlueSin,
             LedMode::WhiteFade,
-            LedMode::Accelerometer,
+            LedMode::BarGraph,
+            LedMode::Zylon,
+            LedMode::Audio,
+            LedMode::Accel,
         ];
 
         // Create two columns for better layout
-        let radio_buttons = modes.chunks(5).enumerate().fold(
+        let radio_buttons = modes.chunks(7).enumerate().fold(
             row!().spacing(80).align_items(Alignment::Start),
             |row_acc, (_col_idx, chunk)| {
                 let column = chunk.iter().fold(
@@ -1191,7 +1203,7 @@ fn configuration_subscription(
         std::any::TypeId::of::<ConfigurationState>(),
         ConfigurationState::Start,
         move |state| {
-            let _selected_image = selected_image.clone();
+            let selected_image = selected_image.clone();
             let selected_led_mode = selected_led_mode;
             let badge_name = badge_name.clone();
             
@@ -1242,7 +1254,7 @@ fn configuration_subscription(
                         
                         // Add timeout to prevent hanging
                         let result = tokio::time::timeout(
-                            Duration::from_secs(10), // 10 second timeout
+                            Duration::from_secs(30), // 10 second timeout
                             tokio::process::Command::new("fwi-serial")
                                 .arg("-s")
                                 .arg("build_a_badge.txt")
@@ -1314,11 +1326,36 @@ fn configuration_subscription(
                         // Step 2: Upload image file
                         println!("Configuration: Starting upload of image file");
                         
+                        // Determine the correct image file path based on selection
+                        let image_file_path = match selected_image.as_ref() {
+                            Some(handle) => {
+                                // Map the image handle to the corresponding .fwi file
+                                if handle == &*DEFCON_LOGO_IMAGE {
+                                    "assets/defcon_logo.fwi"
+                                } else if handle == &*DOGE_IMAGE {
+                                    "assets/doge.fwi"
+                                } else if handle == &*ELON_IMAGE {
+                                    "assets/elon.fwi"
+                                } else if handle == &*PUPPY_IMAGE {
+                                    "assets/puppy.fwi"
+                                } else if handle == &*PIP_BOY_IMAGE {
+                                    "assets/pip_boy.fwi"
+                                } else if handle == &*VEGAS_IMAGE {
+                                    "assets/vegas.fwi"
+                                } else {
+                                    "assets/badge_placeholder.fwi"
+                                }
+                            }
+                            None => "assets/badge_placeholder.fwi"
+                        };
+                        
+                        println!("Configuration: Using image file: {}", image_file_path);
+                        
                         let result = tokio::time::timeout(
-                            Duration::from_secs(10), // 10 second timeout
+                            Duration::from_secs(30), // 10 second timeout
                             tokio::process::Command::new("fwi-serial")
                                 .arg("-s")
-                                .arg("path_to_image_file")
+                                .arg(image_file_path)
                                 .arg("-fn")
                                 .arg("/images/build_a_badge.fwi")
                                 .output()
@@ -1384,7 +1421,7 @@ fn configuration_subscription(
                         println!("Configuration: Starting upload of WASM file (expected to fail if file doesn't exist)");
                         
                         let result = tokio::time::timeout(
-                            Duration::from_secs(10), // 10 second timeout
+                            Duration::from_secs(30), // 10 second timeout
                             tokio::process::Command::new("fwi-serial")
                                 .arg("-s")
                                 .arg("build_a_badge.wasm")
@@ -1444,7 +1481,7 @@ fn configuration_subscription(
                         println!("Configuration: Starting upload of settings file");
                         
                         let result = tokio::time::timeout(
-                            Duration::from_secs(10), // 10 second timeout
+                            Duration::from_secs(30), // 10 second timeout
                             tokio::process::Command::new("fwi-serial")
                                 .arg("-s")
                                 .arg("settings.txt")
@@ -1535,7 +1572,7 @@ enum ConfigurationState {
 fn create_config_content(selected_led_mode: Option<LedMode>, badge_name: String) -> String {
     let led_pattern = match selected_led_mode {
         Some(mode) => mode.display_name(),
-        None => "Off",
+        None => "Manual",
     };
 
     let name = if badge_name.is_empty() {
