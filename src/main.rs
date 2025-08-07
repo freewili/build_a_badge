@@ -5,7 +5,7 @@ use iced::widget::{
 use iced::window;
 use iced::{
     Alignment, Application, Border, Color, Command, ContentFit, Element, Length, Settings, Size,
-    Subscription, Theme, executor,
+    Subscription, Theme, executor, event, mouse, keyboard,
 };
 use std::fs;
 use std::sync::LazyLock;
@@ -137,6 +137,8 @@ enum Message {
     StartConfiguration,
     ConfigurationStepUpdate(String, f32), // step description, progress (0.0-1.0)
     ConfigurationComplete(Result<String, String>),
+    MouseButtonPressed(iced::mouse::Button),
+    KeyPressed(iced::keyboard::Key),
 }
 
 pub fn main() -> iced::Result {
@@ -272,22 +274,81 @@ impl Application for BuildABadgeApp {
                     }
                 }
             }
+            Message::MouseButtonPressed(button) => {
+                // Handle mouse back and forward buttons
+                match button {
+                    mouse::Button::Back => {
+                        // Navigate backwards based on current screen
+                        let previous_screen = match self.current_screen {
+                            AppScreen::Welcome => None,
+                            AppScreen::CustomizeBadge => Some(AppScreen::Welcome),
+                            AppScreen::CustomizeLeds => Some(AppScreen::CustomizeBadge),
+                            AppScreen::NameBadge => Some(AppScreen::CustomizeLeds),
+                            AppScreen::Summary => Some(AppScreen::NameBadge),
+                        };
+                        
+                        if let Some(screen) = previous_screen {
+                            return self.update(Message::NavigateTo(screen));
+                        }
+                    }
+                    mouse::Button::Forward => {
+                        // Navigate forwards based on current screen
+                        let next_screen = match self.current_screen {
+                            AppScreen::Welcome => Some(AppScreen::CustomizeBadge),
+                            AppScreen::CustomizeBadge => Some(AppScreen::CustomizeLeds),
+                            AppScreen::CustomizeLeds => Some(AppScreen::NameBadge),
+                            AppScreen::NameBadge => Some(AppScreen::Summary),
+                            AppScreen::Summary => None,
+                        };
+                        
+                        if let Some(screen) = next_screen {
+                            return self.update(Message::NavigateTo(screen));
+                        }
+                    }
+                    _ => {} // Ignore other mouse buttons
+                }
+            }
+            Message::KeyPressed(key) => {
+                // Handle Enter key on welcome screen to trigger start button
+                if let iced::keyboard::Key::Named(iced::keyboard::key::Named::Enter) = key {
+                    if self.current_screen == AppScreen::Welcome {
+                        return self.update(Message::NavigateTo(AppScreen::CustomizeBadge));
+                    }
+                }
+            }
         }
         Command::none()
     }
 
     fn subscription(&self) -> Subscription<Message> {
-        // Only need subscription for configuration progress, no more animations
+        let mut subscriptions = Vec::new();
+        
+        // Add mouse button subscription for navigation
+        subscriptions.push(
+            event::listen_with(|event, _status| {
+                match event {
+                    event::Event::Mouse(mouse::Event::ButtonPressed(button)) => {
+                        Some(Message::MouseButtonPressed(button))
+                    }
+                    event::Event::Keyboard(keyboard::Event::KeyPressed { key, .. }) => {
+                        Some(Message::KeyPressed(key))
+                    }
+                    _ => None,
+                }
+            })
+        );
+        
+        // Add configuration subscription if configuring
         if self.is_configuring {
             let config_subscription = configuration_subscription(
                 self.selected_customize_image.clone(),
                 self.selected_led_mode,
                 self.badge_name.clone(),
             );
-            config_subscription
-        } else {
-            Subscription::none()
+            subscriptions.push(config_subscription);
         }
+        
+        Subscription::batch(subscriptions)
     }
 
     fn view(&self) -> Element<Message> {
