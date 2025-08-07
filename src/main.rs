@@ -49,8 +49,6 @@ static DEFCON_LOGO_IMAGE: LazyLock<image::Handle> = LazyLock::new(|| {
 });
 static DOGE_IMAGE: LazyLock<image::Handle> =
     LazyLock::new(|| image::Handle::from_memory(include_bytes!("../assets/doge.png").to_vec()));
-static ELON_IMAGE: LazyLock<image::Handle> =
-    LazyLock::new(|| image::Handle::from_memory(include_bytes!("../assets/elon.png").to_vec()));
 static PUPPY_IMAGE: LazyLock<image::Handle> =
     LazyLock::new(|| image::Handle::from_memory(include_bytes!("../assets/puppy.png").to_vec()));
 static PIP_BOY_IMAGE: LazyLock<image::Handle> =
@@ -477,7 +475,7 @@ impl BuildABadgeApp {
             .horizontal_alignment(iced::alignment::Horizontal::Center)
             .width(Length::Fill);
 
-        let images_to_select = [&DEFCON_LOGO_IMAGE, &DOGE_IMAGE, &ELON_IMAGE, &PUPPY_IMAGE, &PIP_BOY_IMAGE, &VEGAS_IMAGE];
+        let images_to_select = [&DEFCON_LOGO_IMAGE, &DOGE_IMAGE, &PUPPY_IMAGE, &PIP_BOY_IMAGE, &VEGAS_IMAGE];
 
         let mut image_selection_row = row![]
             .spacing(10)
@@ -1353,8 +1351,6 @@ fn configuration_subscription(
                                     "assets/defcon_logo.fwi"
                                 } else if handle == &*DOGE_IMAGE {
                                     "assets/doge.fwi"
-                                } else if handle == &*ELON_IMAGE {
-                                    "assets/elon.fwi"
                                 } else if handle == &*PUPPY_IMAGE {
                                     "assets/puppy.fwi"
                                 } else if handle == &*PIP_BOY_IMAGE {
