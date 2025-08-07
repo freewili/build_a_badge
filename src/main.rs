@@ -678,13 +678,11 @@ impl BuildABadgeApp {
 
         let configure_button_text = if self.is_configuring {
             "Configuring..."
-        } else if self.configuration_progress >= 1.0 {
-            "Configuration Complete!"
         } else {
             "Configure Device"
         };
 
-        let configure_button_enabled = !self.is_configuring && self.configuration_progress < 1.0;
+        let configure_button_enabled = !self.is_configuring;
         let configure_button_style = if configure_button_enabled { 
             theme_fn(YellowButtonStyle) 
         } else { 
@@ -701,18 +699,11 @@ impl BuildABadgeApp {
             .padding([5,20])
             .style(theme_fn(YellowButtonStyle));
 
-        let bottom_buttons = if self.configuration_progress >= 1.0 {
-            row![
-                back_button,
-                Space::with_width(Length::Fill),
-                done_button,
-            ]
-        } else {
-            row![
-                back_button,
-                Space::with_width(Length::Fill),
-            ]
-        }
+        let bottom_buttons = row![
+            back_button,
+            Space::with_width(Length::Fill),
+            done_button,
+        ]
         .spacing(20)
         .padding(20)
         .width(Length::Fill);
@@ -811,13 +802,19 @@ impl BuildABadgeApp {
                 configure_button,
                 Space::new(Length::Shrink, Length::Fixed(20.0)),
                 if self.is_configuring || self.configuration_progress > 0.0 {
+                    let status_text = if self.configuration_progress >= 1.0 && !self.is_configuring {
+                        "Configuration Complete! You can configure again anytime."
+                    } else {
+                        &format!("{}%", (self.configuration_progress * 100.0) as u32)
+                    };
+                    
                     container(
                         column![
                             progress_bar(0.0..=1.0, self.configuration_progress)
                                 .width(Length::Fixed(400.0))
                                 .height(Length::Fixed(20.0)),
                             Space::new(Length::Shrink, Length::Fixed(10.0)),
-                            text(format!("{}%", (self.configuration_progress * 100.0) as u32))
+                            text(status_text)
                                 .size(16)
                                 .horizontal_alignment(iced::alignment::Horizontal::Center)
                         ]
