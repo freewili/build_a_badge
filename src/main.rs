@@ -718,9 +718,33 @@ impl BuildABadgeApp {
         .width(Length::Fill);
 
         // Summary content
-        let selected_image_text = match &self.selected_customize_image {
-            Some(_) => "Custom Image Selected",
-            None => "No Image Selected",
+        let selected_image_display = match &self.selected_customize_image {
+            Some(handle) => {
+                container(
+                    image(handle.clone())
+                        .width(Length::Fixed(120.0))
+                        .height(Length::Fixed(120.0))
+                        .content_fit(ContentFit::ScaleDown)
+                )
+                .width(Length::Fixed(140.0))
+                .height(Length::Fixed(140.0))
+                .center_x()
+                .center_y()
+                .style(theme_fn_container(UserImageBorderStyle))
+            },
+            None => {
+                container(
+                    text("No Image\nSelected")
+                        .size(16)
+                        .horizontal_alignment(iced::alignment::Horizontal::Center)
+                        .style(iced::theme::Text::Color(Color::from_rgb8(150, 150, 150)))
+                )
+                .width(Length::Fixed(140.0))
+                .height(Length::Fixed(140.0))
+                .center_x()
+                .center_y()
+                .style(theme_fn_container(UserImageBorderStyle))
+            }
         };
 
         let selected_led_text = match &self.selected_led_mode {
@@ -742,21 +766,36 @@ impl BuildABadgeApp {
             
             container(
                 column![
-                    row![
-                        text("Badge Image: ").size(BODY_SIZE + 2),
-                        text(selected_image_text).size(BODY_SIZE + 2).style(iced::theme::Text::Color(*BLUE_TEXT)),
-                    ].spacing(10),
-                    Space::new(Length::Shrink, Length::Fixed(15.0)),
-                    row![
-                        text("LED Pattern: ").size(BODY_SIZE + 2),
-                        text(selected_led_text).size(BODY_SIZE + 2).style(iced::theme::Text::Color(*BLUE_TEXT)),
-                    ].spacing(10),
-                    Space::new(Length::Shrink, Length::Fixed(15.0)),
-                    row![
-                        text("Badge Name: ").size(BODY_SIZE + 2),
-                        text(badge_name_text).size(BODY_SIZE + 2).style(iced::theme::Text::Color(*BLUE_TEXT)),
-                    ].spacing(10),
+                    // Badge Image Section
+                    column![
+                        text("Badge Image:")
+                            .size(BODY_SIZE + 2)
+                            .horizontal_alignment(iced::alignment::Horizontal::Center),
+                        Space::new(Length::Shrink, Length::Fixed(10.0)),
+                        container(selected_image_display)
+                            .width(Length::Fill)
+                            .center_x(),
+                    ]
+                    .align_items(Alignment::Center)
+                    .spacing(5),
+                    
+                    Space::new(Length::Shrink, Length::Fixed(25.0)),
+                    
+                    // LED Pattern and Badge Name Section
+                    column![
+                        row![
+                            text("LED Pattern: ").size(BODY_SIZE + 2),
+                            text(selected_led_text).size(BODY_SIZE + 2).style(iced::theme::Text::Color(*BLUE_TEXT)),
+                        ].spacing(10).align_items(Alignment::Center),
+                        Space::new(Length::Shrink, Length::Fixed(15.0)),
+                        row![
+                            text("Badge Name: ").size(BODY_SIZE + 2),
+                            text(badge_name_text).size(BODY_SIZE + 2).style(iced::theme::Text::Color(*BLUE_TEXT)),
+                        ].spacing(10).align_items(Alignment::Center),
+                    ]
+                    .align_items(Alignment::Center)
                 ]
+                .align_items(Alignment::Center)
             )
             .padding(30)
             .style(theme_fn_container(SummaryBoxStyle)),
