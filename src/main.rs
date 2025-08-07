@@ -1,18 +1,21 @@
 // main.rs
-use iced::widget::{button, column, container, row, text, Space, image, radio, text_input, progress_bar};
-use iced::{
-    Alignment, Element, Length, Settings, Theme, Color, Size, Border,
-    Application, Command, Subscription, executor,
-    ContentFit,
+use iced::widget::{
+    Space, button, column, container, image, progress_bar, radio, row, text, text_input,
 };
 use iced::window;
+use iced::{
+    Alignment, Application, Border, Color, Command, ContentFit, Element, Length, Settings, Size,
+    Subscription, Theme, executor,
+};
+use std::fs;
 use std::sync::LazyLock;
 use std::time::{Duration, Instant};
-use std::fs;
 
 // Explicitly import necessary types and traits for Iced 0.12.1
 use iced::widget::button::{Appearance as ButtonAppearance, StyleSheet as ButtonStyleSheet};
-use iced::widget::container::{Appearance as ContainerAppearance, StyleSheet as ContainerStyleSheet};
+use iced::widget::container::{
+    Appearance as ContainerAppearance, StyleSheet as ContainerStyleSheet,
+};
 // --- Constants and Statics ---
 static YELLOW: LazyLock<Color> = LazyLock::new(|| Color::from_rgb8(255, 191, 0));
 static BLUE_TEXT: LazyLock<Color> = LazyLock::new(|| Color::from_rgb8(0, 85, 150));
@@ -30,9 +33,8 @@ static LIGHT_ME_ICON: LazyLock<image::Handle> = LazyLock::new(|| {
 static PLACE_ME_ICON: LazyLock<image::Handle> = LazyLock::new(|| {
     image::Handle::from_memory(include_bytes!("../assets/place_me_icon.png").to_vec())
 });
-static APP_LOGO_IMAGE: LazyLock<image::Handle> = LazyLock::new(|| {
-    image::Handle::from_memory(include_bytes!("../assets/logo.png").to_vec())
-});
+static APP_LOGO_IMAGE: LazyLock<image::Handle> =
+    LazyLock::new(|| image::Handle::from_memory(include_bytes!("../assets/logo.png").to_vec()));
 static NAME_ME_IMAGE: LazyLock<image::Handle> = LazyLock::new(|| {
     image::Handle::from_memory(include_bytes!("../assets/badge_placeholder.png").to_vec())
 });
@@ -45,15 +47,12 @@ static DEFAULT_PLACEHOLDER_IMAGE: LazyLock<image::Handle> = LazyLock::new(|| {
 static DEFCON_LOGO_IMAGE: LazyLock<image::Handle> = LazyLock::new(|| {
     image::Handle::from_memory(include_bytes!("../assets/defcon_logo.png").to_vec())
 });
-static DOGE_IMAGE: LazyLock<image::Handle> = LazyLock::new(|| {
-    image::Handle::from_memory(include_bytes!("../assets/doge.png").to_vec())
-});
-static ELON_IMAGE: LazyLock<image::Handle> = LazyLock::new(|| {
-    image::Handle::from_memory(include_bytes!("../assets/puppy.png").to_vec())
-});
-static VEGAS_IMAGE: LazyLock<image::Handle> = LazyLock::new(|| {
-    image::Handle::from_memory(include_bytes!("../assets/vegas.png").to_vec())
-});
+static DOGE_IMAGE: LazyLock<image::Handle> =
+    LazyLock::new(|| image::Handle::from_memory(include_bytes!("../assets/doge.png").to_vec()));
+static ELON_IMAGE: LazyLock<image::Handle> =
+    LazyLock::new(|| image::Handle::from_memory(include_bytes!("../assets/puppy.png").to_vec()));
+static VEGAS_IMAGE: LazyLock<image::Handle> =
+    LazyLock::new(|| image::Handle::from_memory(include_bytes!("../assets/vegas.png").to_vec()));
 
 const HEADING_SIZE: u16 = 30;
 const BODY_SIZE: u16 = 18;
@@ -111,19 +110,18 @@ enum AppScreenTransition {
     FadingIn,
 }
 
-
 struct BuildABadgeApp {
     current_screen: AppScreen,
     selected_customize_image: Option<image::Handle>,
     selected_led_mode: Option<LedMode>,
     badge_name: String,
-    
+
     // Configuration state
     is_configuring: bool,
     configuration_progress: f32,
     configuration_status: String,
     configuration_error: Option<String>,
-    
+
     // Animation state
     transition: AppScreenTransition,
     current_opacity: f32,
@@ -139,7 +137,7 @@ enum Message {
     StartConfiguration,
     ConfigurationProgress,
     ConfigurationComplete(Result<String, String>),
-    
+
     // Animation messages
     Tick(Instant),
 }
@@ -157,7 +155,6 @@ pub fn main() -> iced::Result {
     BuildABadgeApp::run(settings)
 }
 
-
 // --- BuildABadgeApp Implementation - Core Application Logic ---
 impl Application for BuildABadgeApp {
     type Executor = executor::Default;
@@ -172,12 +169,12 @@ impl Application for BuildABadgeApp {
             selected_customize_image: None,
             selected_led_mode: None,
             badge_name: String::new(),
-            
+
             is_configuring: false,
             configuration_progress: 0.0,
             configuration_status: String::new(),
             configuration_error: None,
-            
+
             transition: AppScreenTransition::FadingIn,
             current_opacity: 0.0,
             transition_start_time: Instant::now(),
@@ -185,7 +182,7 @@ impl Application for BuildABadgeApp {
 
         (
             app_state,
-            Command::none() // No initial commands, subscriptions are in `subscription()`
+            Command::none(), // No initial commands, subscriptions are in `subscription()`
         )
     }
 
@@ -199,7 +196,7 @@ impl Application for BuildABadgeApp {
                 if self.current_screen != screen && self.transition == AppScreenTransition::Idle {
                     self.transition = AppScreenTransition::FadingOut(screen);
                     self.transition_start_time = Instant::now();
-                    
+
                     // Clear configuration status when navigating away from summary
                     if self.current_screen == AppScreen::Summary {
                         self.configuration_status = String::new();
@@ -216,10 +213,8 @@ impl Application for BuildABadgeApp {
             }
             Message::BadgeNameChanged(name) => {
                 // Filter to alphanumeric characters only and limit to 23 characters
-                let filtered_name: String = name.chars()
-                    .filter(|c| c.is_alphanumeric())
-                    .collect();
-                
+                let filtered_name: String = name.chars().filter(|c| c.is_alphanumeric()).collect();
+
                 if filtered_name.len() <= 23 {
                     self.badge_name = filtered_name;
                 }
@@ -229,15 +224,15 @@ impl Application for BuildABadgeApp {
                 self.configuration_progress = 0.0;
                 self.configuration_status = "Starting configuration...".to_string();
                 self.configuration_error = None;
-                
+
                 // Create configuration and upload it
                 return Command::perform(
                     configure_device(
                         self.selected_customize_image.clone(),
                         self.selected_led_mode,
-                        self.badge_name.clone()
+                        self.badge_name.clone(),
                     ),
-                    Message::ConfigurationComplete
+                    Message::ConfigurationComplete,
                 );
             }
             Message::ConfigurationProgress => {
@@ -252,7 +247,7 @@ impl Application for BuildABadgeApp {
             Message::ConfigurationComplete(result) => {
                 self.is_configuring = false;
                 self.configuration_progress = 1.0;
-                
+
                 match result {
                     Ok(message) => {
                         println!("Configuration successful: {}", message);
@@ -269,10 +264,12 @@ impl Application for BuildABadgeApp {
 
             Message::Tick(now) => {
                 let elapsed_transition = (now - self.transition_start_time).as_millis() as u64;
-                
+
                 match self.transition {
                     AppScreenTransition::FadingOut(target_screen) => {
-                        let progress = (elapsed_transition as f32 / TRANSITION_DURATION_MILLIS as f32).min(1.0);
+                        let progress = (elapsed_transition as f32
+                            / TRANSITION_DURATION_MILLIS as f32)
+                            .min(1.0);
                         self.current_opacity = 1.0 - progress;
 
                         if progress >= 1.0 {
@@ -280,19 +277,21 @@ impl Application for BuildABadgeApp {
                             self.transition = AppScreenTransition::FadingIn;
                             self.transition_start_time = Instant::now();
                         }
-                    },
+                    }
                     AppScreenTransition::FadingIn => {
-                        let progress = (elapsed_transition as f32 / TRANSITION_DURATION_MILLIS as f32).min(1.0);
+                        let progress = (elapsed_transition as f32
+                            / TRANSITION_DURATION_MILLIS as f32)
+                            .min(1.0);
                         self.current_opacity = progress;
 
                         if progress >= 1.0 {
                             self.transition = AppScreenTransition::Idle;
                             self.current_opacity = 1.0;
                         }
-                    },
+                    }
                     AppScreenTransition::Idle => {}
                 }
-                
+
                 // Update configuration progress if configuring
                 if self.is_configuring {
                     return self.update(Message::ConfigurationProgress);
@@ -303,8 +302,7 @@ impl Application for BuildABadgeApp {
     }
 
     fn subscription(&self) -> Subscription<Message> {
-        iced::time::every(Duration::from_millis(ANIMATION_TICK_MILLIS))
-            .map(Message::Tick)
+        iced::time::every(Duration::from_millis(ANIMATION_TICK_MILLIS)).map(Message::Tick)
     }
 
     fn view(&self) -> Element<Message> {
@@ -321,43 +319,42 @@ impl Application for BuildABadgeApp {
             .height(Length::Fill)
             .center_x()
             .center_y()
-            .style(theme_fn_container(ScreenTransitionStyle(self.current_opacity)));
-        
-        column![
-            animated_content
-        ]
-        .width(Length::Fill)
-        .height(Length::Fill)
-        .into()
+            .style(theme_fn_container(ScreenTransitionStyle(
+                self.current_opacity,
+            )));
+
+        column![animated_content]
+            .width(Length::Fill)
+            .height(Length::Fill)
+            .into()
     }
 }
-
 
 // --- BuildABadgeApp Implementation - Custom Methods (Rendering and Helpers) ---
 impl BuildABadgeApp {
     fn render_welcome_screen(&self) -> Element<Message> {
-    let start_button = button(
-        text("Start")
-        .size(BUTTON_TEXT_SIZE)
-        .horizontal_alignment(iced::alignment::Horizontal::Center)
-    )
-    .on_press(Message::NavigateTo(AppScreen::CustomizeBadge))
-    .padding([10, 40])
-    .style(theme_fn(YellowButtonStyle));
+        let start_button = button(
+            text("Start")
+                .size(BUTTON_TEXT_SIZE)
+                .horizontal_alignment(iced::alignment::Horizontal::Center),
+        )
+        .on_press(Message::NavigateTo(AppScreen::CustomizeBadge))
+        .padding([10, 40])
+        .style(theme_fn(YellowButtonStyle));
 
-    // Create a container for the logo with a smaller, responsive height
-    let app_logo_container = container(
-        image(APP_LOGO_IMAGE.clone())
-            .width(Length::Fixed(300.0)) // Reduced from 400 to 300
-            .height(Length::Fixed(250.0)) // Reduced from 400 to 250
-            .content_fit(ContentFit::ScaleDown) // Ensure the image scales down
-    )
-    .width(Length::Fill) // Make the container fill the width
-    .height(Length::Shrink) // Shrink height to fit the content
-    .center_x()
-    .center_y();
+        // Create a container for the logo with a smaller, responsive height
+        let app_logo_container = container(
+            image(APP_LOGO_IMAGE.clone())
+                .width(Length::Fixed(300.0)) // Reduced from 400 to 300
+                .height(Length::Fixed(250.0)) // Reduced from 400 to 250
+                .content_fit(ContentFit::ScaleDown), // Ensure the image scales down
+        )
+        .width(Length::Fill) // Make the container fill the width
+        .height(Length::Shrink) // Shrink height to fit the content
+        .center_x()
+        .center_y();
 
-    column![
+        column![
         Space::new(Length::Shrink, Length::Fixed(20.0)), // Reduced from 50
         app_logo_container,
         Space::new(Length::Shrink, Length::Fixed(15.0)), // Reduced from 20
@@ -384,10 +381,13 @@ impl BuildABadgeApp {
     .width(Length::Fill)
     .height(Length::Fill)
     .into()
-}
+    }
 
     fn render_customize_badge_screen(&self) -> Element<Message> {
-        let display_image_handle = self.selected_customize_image.as_ref().map_or_else(|| BADGE_PLACEHOLDER_IMAGE.clone(), |h| h.clone());
+        let display_image_handle = self
+            .selected_customize_image
+            .as_ref()
+            .map_or_else(|| BADGE_PLACEHOLDER_IMAGE.clone(), |h| h.clone());
 
         let user_image_widget = image(display_image_handle.clone())
             .width(Length::Fill)
@@ -406,12 +406,7 @@ impl BuildABadgeApp {
             .horizontal_alignment(iced::alignment::Horizontal::Center)
             .width(Length::Fill);
 
-        let images_to_select = [
-            &DEFCON_LOGO_IMAGE,
-            &DOGE_IMAGE,
-            &ELON_IMAGE,
-            &VEGAS_IMAGE,
-        ];
+        let images_to_select = [&DEFCON_LOGO_IMAGE, &DOGE_IMAGE, &ELON_IMAGE, &VEGAS_IMAGE];
 
         let mut image_selection_row = row![]
             .spacing(10)
@@ -420,9 +415,10 @@ impl BuildABadgeApp {
 
         for img_handle_lazy in images_to_select.iter() {
             let img_handle_to_compare = (**img_handle_lazy).clone();
-            let is_selected = self.selected_customize_image.as_ref().map_or(false, |selected| {
-                selected.eq(&img_handle_to_compare)
-            });
+            let is_selected = self
+                .selected_customize_image
+                .as_ref()
+                .map_or(false, |selected| selected.eq(&img_handle_to_compare));
 
             let button_style = if is_selected {
                 theme_fn(SelectedBadgeStyle)
@@ -430,22 +426,24 @@ impl BuildABadgeApp {
                 theme_fn(DefaultBadgeStyle)
             };
 
-            let image_button_content: iced::widget::Image<image::Handle> = image((**img_handle_lazy).clone())
-                .width(Length::Fill)
-                .height(Length::Fill)
-                .content_fit(ContentFit::ScaleDown);
+            let image_button_content: iced::widget::Image<image::Handle> =
+                image((**img_handle_lazy).clone())
+                    .width(Length::Fill)
+                    .height(Length::Fill)
+                    .content_fit(ContentFit::ScaleDown);
 
-            let image_button: iced::widget::Button<'_, Message, Theme, iced::Renderer> = button(image_button_content)
-                .on_press(Message::SelectCustomizeImage((**img_handle_lazy).clone()))
-                .padding(5)
-                .style(button_style);
+            let image_button: iced::widget::Button<'_, Message, Theme, iced::Renderer> =
+                button(image_button_content)
+                    .on_press(Message::SelectCustomizeImage((**img_handle_lazy).clone()))
+                    .padding(5)
+                    .style(button_style);
 
             image_selection_row = image_selection_row.push(
                 container(image_button)
                     .width(Length::FillPortion(1))
                     .height(Length::Fixed(160.0))
                     .center_x()
-                    .center_y()
+                    .center_y(),
             );
         }
 
@@ -467,7 +465,11 @@ impl BuildABadgeApp {
         };
 
         let finish_button = button(text("Next").size(BUTTON_TEXT_SIZE))
-            .on_press_maybe(if finish_button_enabled { Some(finish_button_message) } else { None })
+            .on_press_maybe(if finish_button_enabled {
+                Some(finish_button_message)
+            } else {
+                None
+            })
             .padding([10, 40])
             .style(finish_button_style);
 
@@ -506,12 +508,8 @@ impl BuildABadgeApp {
 
         // Create bottom navigation buttons positioned at bottom corners
         let bottom_navigation = container(
-            row![
-                back_button,
-                Space::with_width(Length::Fill),
-                finish_button,
-            ]
-            .align_items(Alignment::Center)
+            row![back_button, Space::with_width(Length::Fill), finish_button,]
+                .align_items(Alignment::Center),
         )
         .width(Length::Fill)
         .padding(20);
@@ -532,7 +530,7 @@ impl BuildABadgeApp {
             .on_press(Message::NavigateTo(AppScreen::CustomizeBadge))
             .padding([10, 40])
             .style(theme_fn(YellowButtonStyle));
-        
+
         let next_button = button(text("Next").size(BUTTON_TEXT_SIZE))
             .on_press(Message::NavigateTo(AppScreen::NameBadge))
             .padding([10, 40])
@@ -540,15 +538,15 @@ impl BuildABadgeApp {
 
         let modes = [
             LedMode::Off,
-            LedMode::Rainbow, 
+            LedMode::Rainbow,
             LedMode::Snowstorm,
             LedMode::RedChase,
             LedMode::RainbowChase,
-            LedMode::BlueChase, 
+            LedMode::BlueChase,
             LedMode::GreenDot,
             LedMode::BlueSin,
             LedMode::WhiteFade,
-            LedMode::Accelerometer
+            LedMode::Accelerometer,
         ];
 
         // Create two columns for better layout
@@ -558,14 +556,16 @@ impl BuildABadgeApp {
                 let column = chunk.iter().fold(
                     column!().spacing(18).align_items(Alignment::Start),
                     |col_acc, mode| {
-                        col_acc.push(radio(
-                            mode.display_name(),
-                            *mode,
-                            self.selected_led_mode,
-                            Message::SelectLedMode,
+                        col_acc.push(
+                            radio(
+                                mode.display_name(),
+                                *mode,
+                                self.selected_led_mode,
+                                Message::SelectLedMode,
+                            )
+                            .size(20)
+                            .spacing(10),
                         )
-                        .size(20)
-                        .spacing(10))
                     },
                 );
                 row_acc.push(column)
@@ -583,16 +583,14 @@ impl BuildABadgeApp {
                 .horizontal_alignment(iced::alignment::Horizontal::Center),
             container(
                 text("Customize your Badge LEDs")
-                .size(HEADING_SIZE)
-                .style(iced::theme::Text::Color(*BLUE_TEXT))
-                .horizontal_alignment(iced::alignment::Horizontal::Center)
-                .width(Length::Fill)
+                    .size(HEADING_SIZE)
+                    .style(iced::theme::Text::Color(*BLUE_TEXT))
+                    .horizontal_alignment(iced::alignment::Horizontal::Center)
+                    .width(Length::Fill)
             )
             .padding([0, 50]),
             Space::new(Length::Shrink, Length::Fixed(40.0)),
-            container(radio_buttons)
-                .width(Length::Fill)
-                .center_x(),
+            container(radio_buttons).width(Length::Fill).center_x(),
         ]
         .spacing(10)
         .align_items(Alignment::Center)
@@ -600,12 +598,8 @@ impl BuildABadgeApp {
 
         // Create bottom navigation buttons positioned at bottom corners
         let bottom_navigation = container(
-            row![
-                back_button,
-                Space::with_width(Length::Fill),
-                next_button,
-            ]
-            .align_items(Alignment::Center)
+            row![back_button, Space::with_width(Length::Fill), next_button,]
+                .align_items(Alignment::Center),
         )
         .width(Length::Fill)
         .padding(20);
@@ -620,7 +614,7 @@ impl BuildABadgeApp {
         .height(Length::Fill)
         .into()
     }
-    
+
     fn render_name_badge_screen(&self) -> Element<Message> {
         let back_button = button(text("Back").size(BUTTON_TEXT_SIZE))
             .on_press(Message::NavigateTo(AppScreen::CustomizeLeds))
@@ -637,7 +631,7 @@ impl BuildABadgeApp {
             image(NAME_ME_IMAGE.clone())
                 .width(Length::Fixed(300.0))
                 .height(Length::Fixed(300.0))
-                .content_fit(ContentFit::ScaleDown)
+                .content_fit(ContentFit::ScaleDown),
         )
         .width(Length::Fixed(320.0))
         .height(Length::Fixed(320.0))
@@ -685,7 +679,7 @@ impl BuildABadgeApp {
                     .width(Length::Fill),
             ]
             .align_items(Alignment::Center)
-            .spacing(5)
+            .spacing(5),
         )
         .width(Length::Fixed(400.0))
         .center_x()
@@ -720,12 +714,8 @@ impl BuildABadgeApp {
 
         // Create bottom navigation buttons positioned at bottom corners
         let bottom_navigation = container(
-            row![
-                back_button,
-                Space::with_width(Length::Fill),
-                submit_button,
-            ]
-            .align_items(Alignment::Center)
+            row![back_button, Space::with_width(Length::Fill), submit_button,]
+                .align_items(Alignment::Center),
         )
         .width(Length::Fill)
         .padding(20);
@@ -754,14 +744,18 @@ impl BuildABadgeApp {
         };
 
         let configure_button_enabled = !self.is_configuring;
-        let configure_button_style = if configure_button_enabled { 
-            theme_fn(YellowButtonStyle) 
-        } else { 
-            theme_fn(DisabledButtonStyle) 
+        let configure_button_style = if configure_button_enabled {
+            theme_fn(YellowButtonStyle)
+        } else {
+            theme_fn(DisabledButtonStyle)
         };
-        
+
         let configure_button = button(text(configure_button_text).size(BUTTON_TEXT_SIZE))
-            .on_press_maybe(if configure_button_enabled { Some(Message::StartConfiguration) } else { None })
+            .on_press_maybe(if configure_button_enabled {
+                Some(Message::StartConfiguration)
+            } else {
+                None
+            })
             .padding([10, 30])
             .style(configure_button_style);
 
@@ -772,32 +766,28 @@ impl BuildABadgeApp {
 
         // Summary content
         let selected_image_display = match &self.selected_customize_image {
-            Some(handle) => {
-                container(
-                    image(handle.clone())
-                        .width(Length::Fixed(120.0))
-                        .height(Length::Fixed(120.0))
-                        .content_fit(ContentFit::ScaleDown)
-                )
-                .width(Length::Fixed(140.0))
-                .height(Length::Fixed(140.0))
-                .center_x()
-                .center_y()
-                .style(theme_fn_container(UserImageBorderStyle))
-            },
-            None => {
-                container(
-                    text("No Image\nSelected")
-                        .size(16)
-                        .horizontal_alignment(iced::alignment::Horizontal::Center)
-                        .style(iced::theme::Text::Color(Color::from_rgb8(150, 150, 150)))
-                )
-                .width(Length::Fixed(140.0))
-                .height(Length::Fixed(140.0))
-                .center_x()
-                .center_y()
-                .style(theme_fn_container(UserImageBorderStyle))
-            }
+            Some(handle) => container(
+                image(handle.clone())
+                    .width(Length::Fixed(120.0))
+                    .height(Length::Fixed(120.0))
+                    .content_fit(ContentFit::ScaleDown),
+            )
+            .width(Length::Fixed(140.0))
+            .height(Length::Fixed(140.0))
+            .center_x()
+            .center_y()
+            .style(theme_fn_container(UserImageBorderStyle)),
+            None => container(
+                text("No Image\nSelected")
+                    .size(16)
+                    .horizontal_alignment(iced::alignment::Horizontal::Center)
+                    .style(iced::theme::Text::Color(Color::from_rgb8(150, 150, 150))),
+            )
+            .width(Length::Fixed(140.0))
+            .height(Length::Fixed(140.0))
+            .center_x()
+            .center_y()
+            .style(theme_fn_container(UserImageBorderStyle)),
         };
 
         let selected_led_text = match &self.selected_led_mode {
@@ -818,7 +808,6 @@ impl BuildABadgeApp {
                 .size(HEADING_SIZE)
                 .horizontal_alignment(iced::alignment::Horizontal::Center),
             Space::new(Length::Shrink, Length::Fixed(30.0)),
-            
             container(
                 column![
                     // Badge Image Section
@@ -833,20 +822,26 @@ impl BuildABadgeApp {
                     ]
                     .align_items(Alignment::Center)
                     .spacing(5),
-                    
                     Space::new(Length::Shrink, Length::Fixed(25.0)),
-                    
                     // LED Pattern and Badge Name Section
                     column![
                         row![
                             text("LED Pattern: ").size(BODY_SIZE + 2),
-                            text(selected_led_text).size(BODY_SIZE + 2).style(iced::theme::Text::Color(*BLUE_TEXT)),
-                        ].spacing(10).align_items(Alignment::Center),
+                            text(selected_led_text)
+                                .size(BODY_SIZE + 2)
+                                .style(iced::theme::Text::Color(*BLUE_TEXT)),
+                        ]
+                        .spacing(10)
+                        .align_items(Alignment::Center),
                         Space::new(Length::Shrink, Length::Fixed(15.0)),
                         row![
                             text("Badge Name: ").size(BODY_SIZE + 2),
-                            text(badge_name_text).size(BODY_SIZE + 2).style(iced::theme::Text::Color(*BLUE_TEXT)),
-                        ].spacing(10).align_items(Alignment::Center),
+                            text(badge_name_text)
+                                .size(BODY_SIZE + 2)
+                                .style(iced::theme::Text::Color(*BLUE_TEXT)),
+                        ]
+                        .spacing(10)
+                        .align_items(Alignment::Center),
                     ]
                     .align_items(Alignment::Center)
                 ]
@@ -854,9 +849,7 @@ impl BuildABadgeApp {
             )
             .padding(30)
             .style(theme_fn_container(SummaryBoxStyle)),
-            
             Space::new(Length::Shrink, Length::Fixed(40.0)),
-            
             // Configuration section
             column![
                 text("Device Configuration")
@@ -875,7 +868,7 @@ impl BuildABadgeApp {
                     } else {
                         &format!("{}%", (self.configuration_progress * 100.0) as u32)
                     };
-                    
+
                     let mut status_column = column![
                         progress_bar(0.0..=1.0, self.configuration_progress)
                             .width(Length::Fixed(400.0))
@@ -885,23 +878,24 @@ impl BuildABadgeApp {
                             .size(16)
                             .horizontal_alignment(iced::alignment::Horizontal::Center)
                     ];
-                    
+
                     // Add error message if there's an error
                     if let Some(error) = &self.configuration_error {
-                        status_column = status_column.push(Space::new(Length::Shrink, Length::Fixed(10.0)));
+                        status_column =
+                            status_column.push(Space::new(Length::Shrink, Length::Fixed(10.0)));
                         status_column = status_column.push(
                             container(
                                 text(error)
                                     .size(14)
                                     .style(iced::theme::Text::Color(Color::from_rgb8(200, 0, 0)))
-                                    .horizontal_alignment(iced::alignment::Horizontal::Center)
+                                    .horizontal_alignment(iced::alignment::Horizontal::Center),
                             )
                             .width(Length::Fixed(400.0))
                             .padding(10)
-                            .style(theme_fn_container(ErrorBoxStyle))
+                            .style(theme_fn_container(ErrorBoxStyle)),
                         );
                     }
-                    
+
                     container(status_column.align_items(Alignment::Center))
                         .width(Length::Fill)
                         .center_x()
@@ -917,12 +911,8 @@ impl BuildABadgeApp {
 
         // Create bottom navigation buttons positioned at bottom corners
         let bottom_navigation = container(
-            row![
-                back_button,
-                Space::with_width(Length::Fill),
-                done_button,
-            ]
-            .align_items(Alignment::Center)
+            row![back_button, Space::with_width(Length::Fill), done_button,]
+                .align_items(Alignment::Center),
         )
         .width(Length::Fill)
         .padding(20);
@@ -939,7 +929,6 @@ impl BuildABadgeApp {
     }
 }
 
-
 // --- Custom Styles (unchanged) ---
 struct YellowButtonStyle;
 impl ButtonStyleSheet for YellowButtonStyle {
@@ -948,13 +937,19 @@ impl ButtonStyleSheet for YellowButtonStyle {
         ButtonAppearance {
             background: Some((*YELLOW).into()),
             text_color: Color::BLACK,
-            border: Border { radius: 4.0.into(), ..Default::default() },
+            border: Border {
+                radius: 4.0.into(),
+                ..Default::default()
+            },
             ..Default::default()
         }
     }
     fn hovered(&self, style: &Self::Style) -> ButtonAppearance {
         let active = self.active(style);
-        ButtonAppearance { background: Some(Color { a: 0.8, ..*YELLOW }.into()), ..active }
+        ButtonAppearance {
+            background: Some(Color { a: 0.8, ..*YELLOW }.into()),
+            ..active
+        }
     }
 }
 
@@ -965,55 +960,12 @@ impl ButtonStyleSheet for DisabledButtonStyle {
         ButtonAppearance {
             background: Some(Color::from_rgb(0.7, 0.7, 0.7).into()),
             text_color: Color::from_rgb(0.4, 0.4, 0.4),
-            border: Border { radius: 4.0.into(), ..Default::default() },
+            border: Border {
+                radius: 4.0.into(),
+                ..Default::default()
+            },
             ..Default::default()
         }
-    }
-}
-
-struct TopBannerBackgroundStyle;
-impl ContainerStyleSheet for TopBannerBackgroundStyle {
-    type Style = Theme;
-    fn appearance(&self, _style: &Self::Style) -> ContainerAppearance {
-        ContainerAppearance {
-            background: Some((*YELLOW).into()),
-            ..Default::default()
-        }
-    }
-}
-
-struct DefaultTopBannerItemStyle;
-impl ButtonStyleSheet for DefaultTopBannerItemStyle {
-    type Style = Theme;
-    fn active(&self, _style: &Self::Style) -> ButtonAppearance {
-        ButtonAppearance {
-            background: Some(Color::TRANSPARENT.into()),
-            text_color: Color::BLACK,
-            border: Border { color: Color::BLACK, width: 1.0, radius: 2.0.into() },
-            ..Default::default()
-        }
-    }
-    fn hovered(&self, style: &Self::Style) -> ButtonAppearance {
-        ButtonAppearance {
-            background: Some(Color{r:0.0,g:0.0,b:0.0,a:0.1}.into()),
-            ..self.active(style)
-        }
-    }
-}
-
-struct SelectedTopBannerItemStyle;
-impl ButtonStyleSheet for SelectedTopBannerItemStyle {
-    type Style = Theme;
-    fn active(&self, _style: &Self::Style) -> ButtonAppearance {
-        ButtonAppearance {
-            background: Some(Color {a: 0.3, ..*YELLOW}.into()),
-            text_color: Color::BLACK,
-            border: Border { color: Color::BLACK, width: 2.0, radius: 3.0.into() },
-            ..Default::default()
-        }
-    }
-    fn hovered(&self, style: &Self::Style) -> ButtonAppearance {
-        self.active(style)
     }
 }
 
@@ -1024,7 +976,11 @@ impl ButtonStyleSheet for DefaultBadgeStyle {
         ButtonAppearance {
             background: Some(Color::WHITE.into()),
             text_color: Color::BLACK,
-            border: Border { color: Color::BLACK, width: 1.0, radius: 8.0.into() },
+            border: Border {
+                color: Color::BLACK,
+                width: 1.0,
+                radius: 8.0.into(),
+            },
             ..Default::default()
         }
     }
@@ -1042,9 +998,13 @@ impl ButtonStyleSheet for SelectedBadgeStyle {
     type Style = Theme;
     fn active(&self, _style: &Self::Style) -> ButtonAppearance {
         ButtonAppearance {
-            background: Some(Color {a: 0.3, ..*YELLOW}.into()),
+            background: Some(Color { a: 0.3, ..*YELLOW }.into()),
             text_color: Color::BLACK,
-            border: Border { color: *YELLOW, width: 2.0, radius: 8.0.into() },
+            border: Border {
+                color: *YELLOW,
+                width: 2.0,
+                radius: 8.0.into(),
+            },
             ..Default::default()
         }
     }
@@ -1073,35 +1033,24 @@ struct ScreenTransitionStyle(f32);
 impl ContainerStyleSheet for ScreenTransitionStyle {
     type Style = Theme;
     fn appearance(&self, style: &Self::Style) -> ContainerAppearance {
-        let mut appearance = style.appearance(&iced::theme::Container::Box); 
-        
+        let mut appearance = style.appearance(&iced::theme::Container::Box);
+
         if let Some(mut text_color) = appearance.text_color {
             text_color.a *= self.0;
             appearance.text_color = Some(text_color);
         }
-        
+
         if let Some(mut background) = appearance.background {
             match &mut background {
                 iced::Background::Color(color) => {
                     color.a *= self.0;
                     appearance.background = Some(background);
-                },
+                }
                 _ => {}
             }
         }
 
         appearance
-    }
-}
-
-struct DialogBackgroundStyle;
-impl ContainerStyleSheet for DialogBackgroundStyle {
-    type Style = Theme;
-    fn appearance(&self, _style: &Self::Style) -> ContainerAppearance {
-        ContainerAppearance {
-            background: Some(Color { r: 0.0, g: 0.0, b: 0.0, a: 0.7 }.into()),
-            ..Default::default()
-        }
     }
 }
 
@@ -1160,64 +1109,60 @@ async fn configure_device(
     badge_name: String,
 ) -> Result<String, String> {
     // Create configuration content
-    let config_content = create_config_content(selected_image, selected_led_mode, badge_name);
-    
+    let config_content = create_config_content(selected_led_mode, badge_name.clone());
+
     // Write configuration to file
-    let config_file = "badge_config.fwi";
-    match fs::write(config_file, config_content) {
-        Ok(_) => {
-            // Upload the configuration using fwi-serial
-            match upload_configuration(config_file).await {
-                Ok(output) => Ok(format!("Configuration uploaded successfully: {}", output)),
-                Err(e) => Err(format!("Failed to upload configuration: {}", e)),
-            }
-        }
-        Err(e) => Err(format!("Failed to write configuration file: {}", e)),
+    let config_file = "build_a_badge.txt";
+    if fs::write(config_file, config_content).is_err() {
+        return Err(format!("Failed to write configuration file: {}", config_file));
+    }
+
+    // Create configuration content
+    let settings_content = create_settings_content(badge_name.clone());
+
+    // Write configuration to file
+    let settings_file = "settings.txt";
+    if fs::write(settings_file, settings_content).is_err() {
+        return Err(format!("Failed to write settings file: {}", settings_file));
+    }
+
+    // Upload the configuration using fwi-serial
+    match upload_configuration(config_file, settings_file).await {
+        Ok(output) => Ok(format!("Configuration uploaded successfully: {}", output)),
+        Err(e) => Err(format!("Failed to upload configuration: {}", e)),
     }
 }
 
 fn create_config_content(
-    selected_image: Option<image::Handle>,
     selected_led_mode: Option<LedMode>,
     badge_name: String,
 ) -> String {
-    let image_name = match selected_image {
-        Some(_) => "selected_image.png", // In a real implementation, you'd map the handle to actual image name
-        None => "default.png",
-    };
-    
     let led_pattern = match selected_led_mode {
         Some(mode) => mode.display_name(),
         None => "Off",
     };
-    
+
     let name = if badge_name.is_empty() {
-        "Badge"
+        "Free"
     } else {
         &badge_name
     };
-    
+
+    format!("{name}-WiLi\n{led_pattern}\n")
+}
+
+fn create_settings_content(badge_name: String) -> String {
     format!(
-        r#"# Badge Configuration File
-[DISPLAY]
-image={image_name}
-name={name}
-
-[LED]
-pattern={led_pattern}
-
-[SETTINGS]
-version=1.0
-timestamp={}
-"#,
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs()
+        "wifiAPEn=1\n
+wifiAPssid={badge_name}\n
+wifiAPAuth=0\n
+btEn=1\n
+btAPen={badge_name}\n
+btTerm=1\n"
     )
 }
 
-async fn upload_configuration(config_file: &str) -> Result<String, String> {
+async fn upload_configuration(config_file: &str, settings_file: &str) -> Result<String, String> {
     // First, let's read and display the configuration file content for debugging
     match fs::read_to_string(config_file) {
         Ok(content) => {
@@ -1228,27 +1173,132 @@ async fn upload_configuration(config_file: &str) -> Result<String, String> {
             println!("Could not read configuration file for preview");
         }
     }
-    
-    // Execute fwi-serial command
-    let output = tokio::process::Command::new("fwi-serial")
+
+    let mut results = Vec::new();
+
+    // Step 1: Upload configuration file
+    println!("Step 1: Uploading configuration file...");
+    let config_result = tokio::process::Command::new("fwi-serial")
         .arg("-s")
         .arg(config_file)
         .arg("-fn")
-        .arg("/images/badge.fwi")
+        .arg("/build_a_badge.txt")
+        .arg("-mi")
+        .arg("1")
         .output()
         .await;
-    
-    match output {
+
+    match config_result {
         Ok(result) => {
             if result.status.success() {
-                Ok(String::from_utf8_lossy(&result.stdout).to_string())
+                results.push("✓ Configuration file uploaded successfully".to_string());
+                println!("✓ Configuration upload successful");
             } else {
                 let stderr = String::from_utf8_lossy(&result.stderr);
-                // For development, let's show what the command tried to do
-                println!("fwi-serial command executed: fwi-serial -s {} -fn /images/badge.fwi", config_file);
-                Err(stderr.to_string())
+                results.push(format!("✗ Configuration upload failed: {}", stderr));
+                println!("✗ Configuration upload failed");
             }
         }
-        Err(e) => Err(format!("Failed to execute fwi-serial: {}", e)),
+        Err(e) => {
+            results.push(format!("✗ Configuration upload error: {}", e));
+            println!("✗ Configuration upload error: {}", e);
+        }
+    }
+
+    // Step 2: Upload image file
+    println!("Step 2: Uploading image file...");
+    let image_result = tokio::process::Command::new("fwi-serial")
+        .arg("-s")
+        .arg("path_to_image_file")
+        .arg("-fn")
+        .arg("/images/build_a_badge.fwi")
+        .output()
+        .await;
+
+    match image_result {
+        Ok(result) => {
+            if result.status.success() {
+                results.push("✓ Image file uploaded successfully".to_string());
+                println!("✓ Image upload successful");
+            } else {
+                let stderr = String::from_utf8_lossy(&result.stderr);
+                results.push(format!("✗ Image upload failed: {}", stderr));
+                println!("✗ Image upload failed");
+            }
+        }
+        Err(e) => {
+            results.push(format!("✗ Image upload error: {}", e));
+            println!("✗ Image upload error: {}", e);
+        }
+    }
+
+    // Step 3: Upload WASM file
+    println!("Step 3: Uploading WASM file...");
+    let wasm_result = tokio::process::Command::new("fwi-serial")
+        .arg("-s")
+        .arg("build_a_badge.wasm")
+        .output()
+        .await;
+
+    match wasm_result {
+        Ok(result) => {
+            if result.status.success() {
+                results.push("✓ WASM file uploaded successfully".to_string());
+                println!("✓ WASM upload successful");
+            } else {
+                let stderr = String::from_utf8_lossy(&result.stderr);
+                results.push(format!("✗ WASM upload failed: {}", stderr));
+                println!("✗ WASM upload failed (expected - file doesn't exist yet)");
+            }
+        }
+        Err(e) => {
+            results.push(format!("✗ WASM upload error: {}", e));
+            println!(
+                "✗ WASM upload error: {} (expected - file doesn't exist yet)",
+                e
+            );
+        }
+    }
+
+    // Step 4: Upload configuration file
+    println!("Step 4: Uploading configuration file...");
+    let settings_result = tokio::process::Command::new("fwi-serial")
+        .arg("-s")
+        .arg(settings_file)
+        .arg("-fn")
+        .arg("/settings.txt")
+        .arg("-mi")
+        .arg("1")
+        .output()
+        .await;
+
+    match settings_result {
+        Ok(result) => {
+            if result.status.success() {
+                results.push("✓ Configuration file uploaded successfully".to_string());
+                println!("✓ Configuration upload successful");
+            } else {
+                let stderr = String::from_utf8_lossy(&result.stderr);
+                results.push(format!("✗ Configuration upload failed: {}", stderr));
+                println!("✗ Configuration upload failed");
+            }
+        }
+        Err(e) => {
+            results.push(format!("✗ Configuration upload error: {}", e));
+            println!("✗ Configuration upload error: {}", e);
+        }
+    }
+
+    // Return combined results
+    let combined_results = results.join("\n");
+
+    // Check if all critical steps succeeded (allowing WASM to fail)
+    let config_success = results[0].starts_with("✓");
+    let image_success = results[1].starts_with("✓");
+
+    if config_success && image_success {
+        Ok(combined_results)
+    } else {
+        Err(combined_results)
     }
 }
