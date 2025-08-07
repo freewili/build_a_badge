@@ -50,7 +50,11 @@ static DEFCON_LOGO_IMAGE: LazyLock<image::Handle> = LazyLock::new(|| {
 static DOGE_IMAGE: LazyLock<image::Handle> =
     LazyLock::new(|| image::Handle::from_memory(include_bytes!("../assets/doge.png").to_vec()));
 static ELON_IMAGE: LazyLock<image::Handle> =
+    LazyLock::new(|| image::Handle::from_memory(include_bytes!("../assets/elon.png").to_vec()));
+static PUPPY_IMAGE: LazyLock<image::Handle> =
     LazyLock::new(|| image::Handle::from_memory(include_bytes!("../assets/puppy.png").to_vec()));
+static PIP_BOY_IMAGE: LazyLock<image::Handle> =
+    LazyLock::new(|| image::Handle::from_memory(include_bytes!("../assets/pip_boy.jpg").to_vec()));
 static VEGAS_IMAGE: LazyLock<image::Handle> =
     LazyLock::new(|| image::Handle::from_memory(include_bytes!("../assets/vegas.png").to_vec()));
 
@@ -446,7 +450,7 @@ impl BuildABadgeApp {
             .horizontal_alignment(iced::alignment::Horizontal::Center)
             .width(Length::Fill);
 
-        let images_to_select = [&DEFCON_LOGO_IMAGE, &DOGE_IMAGE, &ELON_IMAGE, &VEGAS_IMAGE];
+        let images_to_select = [&DEFCON_LOGO_IMAGE, &DOGE_IMAGE, &ELON_IMAGE, &PUPPY_IMAGE, &PIP_BOY_IMAGE, &VEGAS_IMAGE];
 
         let mut image_selection_row = row![]
             .spacing(10)
