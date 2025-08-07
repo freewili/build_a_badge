@@ -9,7 +9,7 @@ use iced::{
 };
 use std::fs;
 use std::sync::LazyLock;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 // Explicitly import necessary types and traits for Iced 0.12.1
 use iced::widget::button::{Appearance as ButtonAppearance, StyleSheet as ButtonStyleSheet};
@@ -58,9 +58,10 @@ const HEADING_SIZE: u16 = 30;
 const BODY_SIZE: u16 = 18;
 const BUTTON_TEXT_SIZE: u16 = 24;
 
-// Animation constants
-const TRANSITION_DURATION_MILLIS: u64 = 300; // Total duration for fade in/out
-const ANIMATION_TICK_MILLIS: u64 = 16; // Roughly 60 FPS
+// No animation constants needed for instant transitions
+
+// Text input ID for focus management
+const BADGE_NAME_INPUT_ID: &str = "badge_name_input";
 
 // --- Application State and Messages ---
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -106,8 +107,7 @@ impl LedMode {
 #[derive(Debug, Clone, Copy, PartialEq)]
 enum AppScreenTransition {
     Idle,
-    FadingOut(AppScreen),
-    FadingIn,
+    // Removed FadingOut and FadingIn since we have instant transitions
 }
 
 struct BuildABadgeApp {
@@ -121,11 +121,11 @@ struct BuildABadgeApp {
     configuration_progress: f32,
     configuration_status: String,
     configuration_error: Option<String>,
+    configuration_console_output: String,
 
-    // Animation state
+    // Animation state (simplified for instant transitions)
     transition: AppScreenTransition,
     current_opacity: f32,
-    transition_start_time: Instant,
 }
 
 #[derive(Debug, Clone)]
@@ -135,11 +135,8 @@ enum Message {
     SelectLedMode(LedMode),
     BadgeNameChanged(String),
     StartConfiguration,
-    ConfigurationProgress,
+    ConfigurationStepUpdate(String, f32), // step description, progress (0.0-1.0)
     ConfigurationComplete(Result<String, String>),
-
-    // Animation messages
-    Tick(Instant),
 }
 
 pub fn main() -> iced::Result {
@@ -174,10 +171,10 @@ impl Application for BuildABadgeApp {
             configuration_progress: 0.0,
             configuration_status: String::new(),
             configuration_error: None,
+            configuration_console_output: String::new(),
 
-            transition: AppScreenTransition::FadingIn,
-            current_opacity: 0.0,
-            transition_start_time: Instant::now(),
+            transition: AppScreenTransition::Idle,
+            current_opacity: 1.0,
         };
 
         (
@@ -193,15 +190,25 @@ impl Application for BuildABadgeApp {
     fn update(&mut self, message: Message) -> Command<Message> {
         match message {
             Message::NavigateTo(screen) => {
-                if self.current_screen != screen && self.transition == AppScreenTransition::Idle {
-                    self.transition = AppScreenTransition::FadingOut(screen);
-                    self.transition_start_time = Instant::now();
+                if self.current_screen != screen {
+                    // Instant navigation - no transitions
+                    self.current_screen = screen;
+                    self.transition = AppScreenTransition::Idle;
+                    self.current_opacity = 1.0;
 
                     // Clear configuration status when navigating away from summary
-                    if self.current_screen == AppScreen::Summary {
+                    if screen != AppScreen::Summary {
                         self.configuration_status = String::new();
                         self.configuration_error = None;
                         self.configuration_progress = 0.0;
+                        self.configuration_console_output = String::new();
+                    }
+
+                    // Focus the text input when navigating to the name badge screen
+                    if screen == AppScreen::NameBadge {
+                        return Command::batch([
+                            text_input::focus(text_input::Id::new(BADGE_NAME_INPUT_ID))
+                        ]);
                     }
                 }
             }
@@ -224,25 +231,19 @@ impl Application for BuildABadgeApp {
                 self.configuration_progress = 0.0;
                 self.configuration_status = "Starting configuration...".to_string();
                 self.configuration_error = None;
-
-                // Create configuration and upload it
-                return Command::perform(
-                    configure_device(
-                        self.selected_customize_image.clone(),
-                        self.selected_led_mode,
-                        self.badge_name.clone(),
-                    ),
-                    Message::ConfigurationComplete,
-                );
+                self.configuration_console_output = String::new();
             }
-            Message::ConfigurationProgress => {
-                if self.is_configuring && self.configuration_progress < 1.0 {
-                    self.configuration_progress += 0.02; // Increment by 2% each update
-                    if self.configuration_progress >= 1.0 {
-                        self.configuration_progress = 1.0;
-                        self.is_configuring = false;
-                    }
+            Message::ConfigurationStepUpdate(step_description, progress) => {
+                self.configuration_status = step_description.clone();
+                self.configuration_progress = progress;
+                
+                // Append to console output for live updates
+                if !self.configuration_console_output.is_empty() {
+                    self.configuration_console_output.push_str("\n");
                 }
+                self.configuration_console_output.push_str(&step_description);
+                
+                // ConfigurationStepUpdate is only for progress updates, errors use ConfigurationComplete
             }
             Message::ConfigurationComplete(result) => {
                 self.is_configuring = false;
@@ -253,48 +254,22 @@ impl Application for BuildABadgeApp {
                         println!("Configuration successful: {}", message);
                         self.configuration_status = "Configuration successful!".to_string();
                         self.configuration_error = None;
+                        // Keep the existing console output and append success message
+                        if !self.configuration_console_output.is_empty() {
+                            self.configuration_console_output.push_str("\n");
+                        }
+                        self.configuration_console_output.push_str(&message);
                     }
                     Err(error) => {
                         println!("Configuration failed: {}", error);
                         self.configuration_status = "Configuration failed".to_string();
-                        self.configuration_error = Some(error);
-                    }
-                }
-            }
-
-            Message::Tick(now) => {
-                let elapsed_transition = (now - self.transition_start_time).as_millis() as u64;
-
-                match self.transition {
-                    AppScreenTransition::FadingOut(target_screen) => {
-                        let progress = (elapsed_transition as f32
-                            / TRANSITION_DURATION_MILLIS as f32)
-                            .min(1.0);
-                        self.current_opacity = 1.0 - progress;
-
-                        if progress >= 1.0 {
-                            self.current_screen = target_screen;
-                            self.transition = AppScreenTransition::FadingIn;
-                            self.transition_start_time = Instant::now();
+                        self.configuration_error = Some(error.clone());
+                        // Keep the existing console output and append error message
+                        if !self.configuration_console_output.is_empty() {
+                            self.configuration_console_output.push_str("\n");
                         }
+                        self.configuration_console_output.push_str(&error);
                     }
-                    AppScreenTransition::FadingIn => {
-                        let progress = (elapsed_transition as f32
-                            / TRANSITION_DURATION_MILLIS as f32)
-                            .min(1.0);
-                        self.current_opacity = progress;
-
-                        if progress >= 1.0 {
-                            self.transition = AppScreenTransition::Idle;
-                            self.current_opacity = 1.0;
-                        }
-                    }
-                    AppScreenTransition::Idle => {}
-                }
-
-                // Update configuration progress if configuring
-                if self.is_configuring {
-                    return self.update(Message::ConfigurationProgress);
                 }
             }
         }
@@ -302,7 +277,17 @@ impl Application for BuildABadgeApp {
     }
 
     fn subscription(&self) -> Subscription<Message> {
-        iced::time::every(Duration::from_millis(ANIMATION_TICK_MILLIS)).map(Message::Tick)
+        // Only need subscription for configuration progress, no more animations
+        if self.is_configuring {
+            let config_subscription = configuration_subscription(
+                self.selected_customize_image.clone(),
+                self.selected_led_mode,
+                self.badge_name.clone(),
+            );
+            config_subscription
+        } else {
+            Subscription::none()
+        }
     }
 
     fn view(&self) -> Element<Message> {
@@ -314,18 +299,12 @@ impl Application for BuildABadgeApp {
             AppScreen::Summary => self.render_summary_screen(),
         };
 
-        let animated_content = container(current_screen_element)
+        // No transitions - just show the current screen directly
+        container(current_screen_element)
             .width(Length::Fill)
             .height(Length::Fill)
             .center_x()
             .center_y()
-            .style(theme_fn_container(ScreenTransitionStyle(
-                self.current_opacity,
-            )));
-
-        column![animated_content]
-            .width(Length::Fill)
-            .height(Length::Fill)
             .into()
     }
 }
@@ -665,9 +644,11 @@ impl BuildABadgeApp {
                 container(
                     text_input::<_, Theme, iced::Renderer>("Enter name...", &self.badge_name)
                         .on_input(Message::BadgeNameChanged)
+                        .on_submit(Message::NavigateTo(AppScreen::Summary))
                         .padding(15)
                         .size(BODY_SIZE)
                         .width(Length::Fixed(300.0))
+                        .id(text_input::Id::new(BADGE_NAME_INPUT_ID))
                 )
                 .width(Length::Fill)
                 .center_x(),
@@ -879,6 +860,29 @@ impl BuildABadgeApp {
                             .horizontal_alignment(iced::alignment::Horizontal::Center)
                     ];
 
+                    // Add console output if there's any
+                    if !self.configuration_console_output.is_empty() {
+                        status_column = status_column.push(Space::new(Length::Shrink, Length::Fixed(15.0)));
+                        status_column = status_column.push(
+                            text("Console Output:")
+                                .size(14)
+                                .style(iced::theme::Text::Color(*BLUE_TEXT))
+                        );
+                        status_column = status_column.push(Space::new(Length::Shrink, Length::Fixed(5.0)));
+                        status_column = status_column.push(
+                            container(
+                                text(&self.configuration_console_output)
+                                    .size(12)
+                                    .style(iced::theme::Text::Color(Color::from_rgb(0.9, 0.9, 0.9)))
+                                    .horizontal_alignment(iced::alignment::Horizontal::Left)
+                            )
+                            .width(Length::Fixed(600.0))
+                            .height(Length::Fixed(200.0))
+                            .padding(10)
+                            .style(theme_fn_container(ConsoleOutputStyle))
+                        );
+                    }
+
                     // Add error message if there's an error
                     if let Some(error) = &self.configuration_error {
                         status_column =
@@ -1029,31 +1033,6 @@ impl ContainerStyleSheet for UserImageBorderStyle {
     }
 }
 
-struct ScreenTransitionStyle(f32);
-impl ContainerStyleSheet for ScreenTransitionStyle {
-    type Style = Theme;
-    fn appearance(&self, style: &Self::Style) -> ContainerAppearance {
-        let mut appearance = style.appearance(&iced::theme::Container::Box);
-
-        if let Some(mut text_color) = appearance.text_color {
-            text_color.a *= self.0;
-            appearance.text_color = Some(text_color);
-        }
-
-        if let Some(mut background) = appearance.background {
-            match &mut background {
-                iced::Background::Color(color) => {
-                    color.a *= self.0;
-                    appearance.background = Some(background);
-                }
-                _ => {}
-            }
-        }
-
-        appearance
-    }
-}
-
 struct SummaryBoxStyle;
 impl ContainerStyleSheet for SummaryBoxStyle {
     type Style = Theme;
@@ -1086,6 +1065,23 @@ impl ContainerStyleSheet for ErrorBoxStyle {
     }
 }
 
+struct ConsoleOutputStyle;
+impl ContainerStyleSheet for ConsoleOutputStyle {
+    type Style = Theme;
+    fn appearance(&self, _style: &Self::Style) -> ContainerAppearance {
+        ContainerAppearance {
+            background: Some(Color::from_rgb(0.05, 0.05, 0.05).into()),
+            border: Border {
+                color: Color::from_rgb(0.3, 0.3, 0.3),
+                width: 1.0,
+                radius: 4.0.into(),
+            },
+            text_color: Some(Color::from_rgb(0.9, 0.9, 0.9)),
+            ..Default::default()
+        }
+    }
+}
+
 fn theme_fn<T>(style: T) -> iced::theme::Button
 where
     T: ButtonStyleSheet<Style = Theme> + 'static,
@@ -1102,41 +1098,316 @@ where
     iced::theme::Container::Custom(Box::new(style))
 }
 
-// Configuration function for device setup
-async fn configure_device(
+fn configuration_subscription(
     selected_image: Option<image::Handle>,
     selected_led_mode: Option<LedMode>,
     badge_name: String,
-) -> Result<String, String> {
-    // Create configuration content
-    let config_content = create_config_content(selected_led_mode, badge_name.clone());
+) -> Subscription<Message> {
+    iced::subscription::unfold(
+        std::any::TypeId::of::<ConfigurationState>(),
+        ConfigurationState::Start,
+        move |state| {
+            let _selected_image = selected_image.clone();
+            let selected_led_mode = selected_led_mode;
+            let badge_name = badge_name.clone();
+            
+            async move {
+                match state {
+                    ConfigurationState::Start => {
+                        // Step 1: Create configuration files
+                        println!("Configuration: Starting configuration process");
+                        tokio::time::sleep(Duration::from_millis(100)).await;
+                        
+                        let config_content = create_config_content(selected_led_mode, badge_name.clone());
+                        let config_file = "build_a_badge.txt";
+                        println!("Configuration: Creating config file '{}' with content:\n{}", config_file, config_content);
+                        if fs::write(config_file, &config_content).is_err() {
+                            let error_msg = format!("Failed to write configuration file: {}", config_file);
+                            println!("Configuration ERROR: {}", error_msg);
+                            return (
+                                Message::ConfigurationComplete(Err(error_msg)),
+                                ConfigurationState::Done,
+                            );
+                        }
+                        println!("Configuration: Successfully wrote config file");
 
-    // Write configuration to file
-    let config_file = "build_a_badge.txt";
-    if fs::write(config_file, config_content).is_err() {
-        return Err(format!("Failed to write configuration file: {}", config_file));
-    }
+                        let settings_content = create_settings_content(badge_name.clone());
+                        let settings_file = "settings.txt";
+                        println!("Configuration: Creating settings file '{}' with content:\n{}", settings_file, settings_content);
+                        if fs::write(settings_file, settings_content).is_err() {
+                            let error_msg = format!("Failed to write settings file: {}", settings_file);
+                            println!("Configuration ERROR: {}", error_msg);
+                            return (
+                                Message::ConfigurationComplete(Err(error_msg)),
+                                ConfigurationState::Done,
+                            );
+                        }
+                        println!("Configuration: Successfully wrote settings file");
 
-    // Create configuration content
-    let settings_content = create_settings_content(badge_name.clone());
+                        let step_message = format!("Generated configuration file content:\n{}\nStep 1: Uploading configuration file...", config_content);
+                        println!("Configuration: {}", step_message);
+                        (
+                            Message::ConfigurationStepUpdate(step_message, 0.1),
+                            ConfigurationState::UploadConfig,
+                        )
+                    }
+                    ConfigurationState::UploadConfig => {
+                        // Step 1: Upload configuration file
+                        println!("Configuration: Starting upload of configuration file");
+                        
+                        // Add timeout to prevent hanging
+                        let result = tokio::time::timeout(
+                            Duration::from_secs(10), // 10 second timeout
+                            tokio::process::Command::new("fwi-serial")
+                                .arg("-s")
+                                .arg("build_a_badge.txt")
+                                .arg("-fn")
+                                .arg("/build_a_badge.txt")
+                                .arg("-mi")
+                                .arg("1")
+                                .output()
+                        ).await;
 
-    // Write configuration to file
-    let settings_file = "settings.txt";
-    if fs::write(settings_file, settings_content).is_err() {
-        return Err(format!("Failed to write settings file: {}", settings_file));
-    }
+                        let (success, message) = match result {
+                            Ok(Ok(output)) => {
+                                println!("Configuration: fwi-serial command completed with exit status: {}", output.status);
+                                if !output.stdout.is_empty() {
+                                    println!("Configuration: stdout: {}", String::from_utf8_lossy(&output.stdout));
+                                }
+                                if !output.stderr.is_empty() {
+                                    println!("Configuration: stderr: {}", String::from_utf8_lossy(&output.stderr));
+                                }
+                                
+                                if output.status.success() {
+                                    let msg = "✓ Configuration file uploaded successfully\nStep 2: Uploading image file...".to_string();
+                                    println!("Configuration: {}", msg);
+                                    (true, msg)
+                                } else {
+                                    let stderr = String::from_utf8_lossy(&output.stderr);
+                                    let msg = format!("✗ Configuration upload failed: {}\nConfiguration stopped due to error.", stderr);
+                                    println!("Configuration ERROR: {}", msg);
+                                    (false, msg)
+                                }
+                            }
+                            Ok(Err(e)) => {
+                                let msg = format!("✗ Configuration upload error: {}\nConfiguration stopped due to error.", e);
+                                println!("Configuration ERROR: {}", msg);
+                                (false, msg)
+                            },
+                            Err(_) => {
+                                let msg = "✗ Configuration upload timed out (10 seconds) - device may not be connected\nConfiguration stopped due to error.".to_string();
+                                println!("Configuration ERROR: {}", msg);
+                                println!("Configuration: Timeout occurred, returning error message");
+                                (false, msg)
+                            }
+                        };
 
-    // Upload the configuration using fwi-serial
-    match upload_configuration(config_file, settings_file).await {
-        Ok(output) => Ok(format!("Configuration uploaded successfully: {}", output)),
-        Err(e) => Err(format!("Failed to upload configuration: {}", e)),
-    }
+                        if !success {
+                            println!("Configuration: Returning error ConfigurationComplete with message: {}", message);
+                            return (
+                                Message::ConfigurationComplete(Err(message.clone())),
+                                ConfigurationState::Done,
+                            );
+                        }
+
+                        (
+                            Message::ConfigurationStepUpdate(message, 0.3),
+                            ConfigurationState::UploadImage,
+                        )
+                    }
+                    ConfigurationState::UploadImage => {
+                        // Step 2: Upload image file
+                        println!("Configuration: Starting upload of image file");
+                        
+                        let result = tokio::time::timeout(
+                            Duration::from_secs(10), // 10 second timeout
+                            tokio::process::Command::new("fwi-serial")
+                                .arg("-s")
+                                .arg("path_to_image_file")
+                                .arg("-fn")
+                                .arg("/images/build_a_badge.fwi")
+                                .output()
+                        ).await;
+
+                        let (success, message) = match result {
+                            Ok(Ok(output)) => {
+                                println!("Configuration: fwi-serial image upload completed with exit status: {}", output.status);
+                                if !output.stdout.is_empty() {
+                                    println!("Configuration: stdout: {}", String::from_utf8_lossy(&output.stdout));
+                                }
+                                if !output.stderr.is_empty() {
+                                    println!("Configuration: stderr: {}", String::from_utf8_lossy(&output.stderr));
+                                }
+                                
+                                if output.status.success() {
+                                    let msg = "✓ Image file uploaded successfully\nStep 3: Uploading WASM file...".to_string();
+                                    println!("Configuration: {}", msg);
+                                    (true, msg)
+                                } else {
+                                    let stderr = String::from_utf8_lossy(&output.stderr);
+                                    let msg = format!("✗ Image upload failed: {}\nConfiguration stopped due to error.", stderr);
+                                    println!("Configuration ERROR: {}", msg);
+                                    (false, msg)
+                                }
+                            }
+                            Ok(Err(e)) => {
+                                let msg = format!("✗ Image upload error: {}\nConfiguration stopped due to error.", e);
+                                println!("Configuration ERROR: {}", msg);
+                                (false, msg)
+                            },
+                            Err(_) => {
+                                let msg = "✗ Image upload timed out (10 seconds) - device may not be connected\nConfiguration stopped due to error.".to_string();
+                                println!("Configuration ERROR: {}", msg);
+                                (false, msg)
+                            }
+                        };
+
+                        if !success {
+                            return (
+                                Message::ConfigurationComplete(Err(message.clone())),
+                                ConfigurationState::Done,
+                            );
+                        }
+
+                        (
+                            Message::ConfigurationStepUpdate(message, 0.5),
+                            ConfigurationState::UploadWasm,
+                        )
+                    }
+                    ConfigurationState::UploadWasm => {
+                        // Step 3: Upload WASM file (allowed to fail)
+                        println!("Configuration: Starting upload of WASM file (expected to fail if file doesn't exist)");
+                        
+                        let result = tokio::time::timeout(
+                            Duration::from_secs(10), // 10 second timeout
+                            tokio::process::Command::new("fwi-serial")
+                                .arg("-s")
+                                .arg("build_a_badge.wasm")
+                                .output()
+                        ).await;
+
+                        let message = match result {
+                            Ok(Ok(output)) => {
+                                println!("Configuration: fwi-serial WASM upload completed with exit status: {}", output.status);
+                                if !output.stdout.is_empty() {
+                                    println!("Configuration: stdout: {}", String::from_utf8_lossy(&output.stdout));
+                                }
+                                if !output.stderr.is_empty() {
+                                    println!("Configuration: stderr: {}", String::from_utf8_lossy(&output.stderr));
+                                }
+                                
+                                if output.status.success() {
+                                    let msg = "✓ WASM file uploaded successfully\nStep 4: Uploading settings file...".to_string();
+                                    println!("Configuration: {}", msg);
+                                    msg
+                                } else {
+                                    let msg = "✗ WASM upload failed (expected - file doesn't exist yet)\nStep 4: Uploading settings file...".to_string();
+                                    println!("Configuration: {}", msg);
+                                    msg
+                                }
+                            }
+                            Ok(Err(e)) => {
+                                let msg = "✗ WASM upload error (expected - file doesn't exist yet)\nStep 4: Uploading settings file...".to_string();
+                                println!("Configuration: {} (Error: {})", msg, e);
+                                msg
+                            },
+                            Err(_) => {
+                                let msg = "✗ WASM upload timed out (expected - file doesn't exist yet)\nStep 4: Uploading settings file...".to_string();
+                                println!("Configuration: {}", msg);
+                                msg
+                            }
+                        };
+
+                        // WASM failure is expected and doesn't stop the process
+                        (
+                            Message::ConfigurationStepUpdate(message, 0.7),
+                            ConfigurationState::UploadSettings,
+                        )
+                    }
+                    ConfigurationState::UploadSettings => {
+                        // Step 4: Upload settings file
+                        println!("Configuration: Starting upload of settings file");
+                        
+                        let result = tokio::time::timeout(
+                            Duration::from_secs(10), // 10 second timeout
+                            tokio::process::Command::new("fwi-serial")
+                                .arg("-s")
+                                .arg("settings.txt")
+                                .arg("-fn")
+                                .arg("/settings.txt")
+                                .arg("-mi")
+                                .arg("1")
+                                .output()
+                        ).await;
+
+                        let (success, final_message) = match result {
+                            Ok(Ok(output)) => {
+                                println!("Configuration: fwi-serial settings upload completed with exit status: {}", output.status);
+                                if !output.stdout.is_empty() {
+                                    println!("Configuration: stdout: {}", String::from_utf8_lossy(&output.stdout));
+                                }
+                                if !output.stderr.is_empty() {
+                                    println!("Configuration: stderr: {}", String::from_utf8_lossy(&output.stderr));
+                                }
+                                
+                                if output.status.success() {
+                                    let msg = "✓ Settings file uploaded successfully".to_string();
+                                    println!("Configuration: {}", msg);
+                                    (true, msg)
+                                } else {
+                                    let stderr = String::from_utf8_lossy(&output.stderr);
+                                    let msg = format!("✗ Settings upload failed: {}\nConfiguration stopped due to error.", stderr);
+                                    println!("Configuration ERROR: {}", msg);
+                                    (false, msg)
+                                }
+                            }
+                            Ok(Err(e)) => {
+                                let msg = format!("✗ Settings upload error: {}\nConfiguration stopped due to error.", e);
+                                println!("Configuration ERROR: {}", msg);
+                                (false, msg)
+                            },
+                            Err(_) => {
+                                let msg = "✗ Settings upload timed out (10 seconds) - device may not be connected\nConfiguration stopped due to error.".to_string();
+                                println!("Configuration ERROR: {}", msg);
+                                (false, msg)
+                            }
+                        };
+
+                        let result = if success {
+                            println!("Configuration: All steps completed successfully!");
+                            Ok("Configuration completed successfully!".to_string())
+                        } else {
+                            println!("Configuration: Process failed during settings upload");
+                            Err(final_message)
+                        };
+
+                        (
+                            Message::ConfigurationComplete(result),
+                            ConfigurationState::Done,
+                        )
+                    }
+                    ConfigurationState::Done => {
+                        // Configuration finished, wait indefinitely
+                        println!("Configuration: Reached Done state - configuration process complete");
+                        futures::future::pending().await
+                    }
+                }
+            }
+        },
+    )
 }
 
-fn create_config_content(
-    selected_led_mode: Option<LedMode>,
-    badge_name: String,
-) -> String {
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+enum ConfigurationState {
+    Start,
+    UploadConfig,
+    UploadImage,
+    UploadWasm,
+    UploadSettings,
+    Done,
+}
+
+fn create_config_content(selected_led_mode: Option<LedMode>, badge_name: String) -> String {
     let led_pattern = match selected_led_mode {
         Some(mode) => mode.display_name(),
         None => "Off",
@@ -1154,151 +1425,10 @@ fn create_config_content(
 fn create_settings_content(badge_name: String) -> String {
     format!(
         "wifiAPEn=1\n
-wifiAPssid={badge_name}\n
+wifiAPssid={badge_name}-WiLi\n
 wifiAPAuth=0\n
 btEn=1\n
-btAPen={badge_name}\n
+btAPen={badge_name}-WiLi\n
 btTerm=1\n"
     )
-}
-
-async fn upload_configuration(config_file: &str, settings_file: &str) -> Result<String, String> {
-    // First, let's read and display the configuration file content for debugging
-    match fs::read_to_string(config_file) {
-        Ok(content) => {
-            println!("Generated configuration file content:");
-            println!("{}", content);
-        }
-        Err(_) => {
-            println!("Could not read configuration file for preview");
-        }
-    }
-
-    let mut results = Vec::new();
-
-    // Step 1: Upload configuration file
-    println!("Step 1: Uploading configuration file...");
-    let config_result = tokio::process::Command::new("fwi-serial")
-        .arg("-s")
-        .arg(config_file)
-        .arg("-fn")
-        .arg("/build_a_badge.txt")
-        .arg("-mi")
-        .arg("1")
-        .output()
-        .await;
-
-    match config_result {
-        Ok(result) => {
-            if result.status.success() {
-                results.push("✓ Configuration file uploaded successfully".to_string());
-                println!("✓ Configuration upload successful");
-            } else {
-                let stderr = String::from_utf8_lossy(&result.stderr);
-                results.push(format!("✗ Configuration upload failed: {}", stderr));
-                println!("✗ Configuration upload failed");
-            }
-        }
-        Err(e) => {
-            results.push(format!("✗ Configuration upload error: {}", e));
-            println!("✗ Configuration upload error: {}", e);
-        }
-    }
-
-    // Step 2: Upload image file
-    println!("Step 2: Uploading image file...");
-    let image_result = tokio::process::Command::new("fwi-serial")
-        .arg("-s")
-        .arg("path_to_image_file")
-        .arg("-fn")
-        .arg("/images/build_a_badge.fwi")
-        .output()
-        .await;
-
-    match image_result {
-        Ok(result) => {
-            if result.status.success() {
-                results.push("✓ Image file uploaded successfully".to_string());
-                println!("✓ Image upload successful");
-            } else {
-                let stderr = String::from_utf8_lossy(&result.stderr);
-                results.push(format!("✗ Image upload failed: {}", stderr));
-                println!("✗ Image upload failed");
-            }
-        }
-        Err(e) => {
-            results.push(format!("✗ Image upload error: {}", e));
-            println!("✗ Image upload error: {}", e);
-        }
-    }
-
-    // Step 3: Upload WASM file
-    println!("Step 3: Uploading WASM file...");
-    let wasm_result = tokio::process::Command::new("fwi-serial")
-        .arg("-s")
-        .arg("build_a_badge.wasm")
-        .output()
-        .await;
-
-    match wasm_result {
-        Ok(result) => {
-            if result.status.success() {
-                results.push("✓ WASM file uploaded successfully".to_string());
-                println!("✓ WASM upload successful");
-            } else {
-                let stderr = String::from_utf8_lossy(&result.stderr);
-                results.push(format!("✗ WASM upload failed: {}", stderr));
-                println!("✗ WASM upload failed (expected - file doesn't exist yet)");
-            }
-        }
-        Err(e) => {
-            results.push(format!("✗ WASM upload error: {}", e));
-            println!(
-                "✗ WASM upload error: {} (expected - file doesn't exist yet)",
-                e
-            );
-        }
-    }
-
-    // Step 4: Upload configuration file
-    println!("Step 4: Uploading configuration file...");
-    let settings_result = tokio::process::Command::new("fwi-serial")
-        .arg("-s")
-        .arg(settings_file)
-        .arg("-fn")
-        .arg("/settings.txt")
-        .arg("-mi")
-        .arg("1")
-        .output()
-        .await;
-
-    match settings_result {
-        Ok(result) => {
-            if result.status.success() {
-                results.push("✓ Configuration file uploaded successfully".to_string());
-                println!("✓ Configuration upload successful");
-            } else {
-                let stderr = String::from_utf8_lossy(&result.stderr);
-                results.push(format!("✗ Configuration upload failed: {}", stderr));
-                println!("✗ Configuration upload failed");
-            }
-        }
-        Err(e) => {
-            results.push(format!("✗ Configuration upload error: {}", e));
-            println!("✗ Configuration upload error: {}", e);
-        }
-    }
-
-    // Return combined results
-    let combined_results = results.join("\n");
-
-    // Check if all critical steps succeeded (allowing WASM to fail)
-    let config_success = results[0].starts_with("✓");
-    let image_success = results[1].starts_with("✓");
-
-    if config_success && image_success {
-        Ok(combined_results)
-    } else {
-        Err(combined_results)
-    }
 }
