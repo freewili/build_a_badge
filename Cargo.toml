@@ -1,0 +1,21 @@
+[package]
+name = "build_a_badge"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+iced = { version = "0.12.1", features = ["tokio", "image", "debug", "wgpu"] }
+tokio = { version = "1", features = ["full"] } # Keep all these Tokio features
+rand = "0.8"
+rfd = "0.12" # <--- This is the correct way for rfd 0.12. It will automatically use Tokio if available.
+nokhwa = { version = "0.10", features = ["input-native"] }
+image = "0.24"
+async-stream = "0.3"
+anyhow = "1.0"
+
+
+# Audio recording dependencies
+cpal = "0.15" # Cross-platform audio I/O
+hound = "3.5" # WAV file encoding
+futures = "0.3.31"
+iced_futures = { version = "0.12", features = ["tokio"] } # <--- CHANGE THIS LINE
