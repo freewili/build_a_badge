@@ -169,9 +169,13 @@ impl Application for BuildABadgeApp {
                 self.selected_led_mode = Some(mode);
             }
             Message::BadgeNameChanged(name) => {
-                // Limit the badge name to 23 characters
-                if name.len() <= 23 {
-                    self.badge_name = name;
+                // Filter to alphanumeric characters only and limit to 23 characters
+                let filtered_name: String = name.chars()
+                    .filter(|c| c.is_alphanumeric())
+                    .collect();
+                
+                if filtered_name.len() <= 23 {
+                    self.badge_name = filtered_name;
                 }
             }
 
@@ -538,6 +542,11 @@ impl BuildABadgeApp {
                 text("Type Your Badge Name Below")
                     .size(HEADING_SIZE)
                     .horizontal_alignment(iced::alignment::Horizontal::Center)
+                    .width(Length::Fill),
+                text("(Letters and numbers only)")
+                    .size(16)
+                    .horizontal_alignment(iced::alignment::Horizontal::Center)
+                    .style(iced::theme::Text::Color(Color::from_rgb8(100, 100, 100)))
                     .width(Length::Fill),
                 Space::new(Length::Shrink, Length::Fixed(20.0)),
                 container(
